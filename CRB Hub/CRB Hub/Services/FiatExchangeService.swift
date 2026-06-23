@@ -7,7 +7,7 @@ struct ExchangeRatesResponse: Decodable {
     let rates: [String: Decimal]
 }
 
-private extension ExchangeRatesResponse {
+extension ExchangeRatesResponse {
     struct DecimalValue: Decodable {
         let value: Decimal
 
