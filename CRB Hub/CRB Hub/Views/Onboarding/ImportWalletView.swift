@@ -141,7 +141,9 @@ struct ImportWalletView: View {
                         icon: "checkmark.circle.fill",
                         isDisabled: isImporting || previewAddress == nil || walletName.isEmpty
                     ) {
-                        importWallet()
+                        Task {
+                            await importWallet()
+                        }
                     }
                     
                     // Security note
@@ -175,12 +177,13 @@ struct ImportWalletView: View {
         }
     }
     
-    private func importWallet() {
+    private func importWallet() async {
         isImporting = true
         error = nil
+        defer { isImporting = false }
         
         do {
-            try appState.importWallet(
+            try await appState.importWalletWithBiometricSetup(
                 name: walletName.isEmpty ? "Imported Wallet" : walletName,
                 privateKeyHex: privateKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             )
@@ -188,8 +191,6 @@ struct ImportWalletView: View {
         } catch {
             self.error = error.localizedDescription
         }
-        
-        isImporting = false
     }
 }
 

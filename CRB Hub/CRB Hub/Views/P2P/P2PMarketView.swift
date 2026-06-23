@@ -348,7 +348,7 @@ struct P2PMarketView: View {
         let rates = appState.cachedFXRates
         let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
         let price = offer.Price ?? 0
-        let priceInFiat = price * rate
+        let priceInFiat = price * Decimal(rate)
         
         return HStack(spacing: CRBTheme.Spacing.md) {
             // Side badge
@@ -362,11 +362,11 @@ struct P2PMarketView: View {
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(CRBTheme.Colors.ink)
                 
-                Text("≈ " + CurrencyManager.formatFiat(Decimal(priceInFiat), currencyCode: currency))
+                Text("≈ " + CurrencyManager.formatFiat(priceInFiat, currencyCode: currency))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(CRBTheme.Colors.muted)
                 
-                Text("\(String(format: "%.2f", offer.MinCRB ?? 0)) - \(String(format: "%.2f", offer.MaxCRB ?? 0)) CRB")
+                Text("\(CRBUnits.formatDecimal(offer.MinCRB ?? 0, maxFractionDigits: 2, minFractionDigits: 2)) - \(CRBUnits.formatDecimal(offer.MaxCRB ?? 0, maxFractionDigits: 2, minFractionDigits: 2)) CRB")
                     .font(.system(size: 11))
                     .foregroundColor(CRBTheme.Colors.muted.opacity(0.8))
             }
@@ -400,8 +400,8 @@ struct P2PMarketView: View {
                 let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
                 
                 ForEach(viewModel.recentTrades) { trade in
-                    let tradePriceInFiat = (trade.Price ?? 0) * rate
-                    let valInFiat = (trade.AmountUSDT ?? 0) * rate
+                    let tradePriceInFiat = (trade.Price ?? 0) * Decimal(rate)
+                    let valInFiat = (trade.AmountUSDT ?? 0) * Decimal(rate)
                     
                     HStack(spacing: CRBTheme.Spacing.md) {
                         PillBadge(
@@ -410,11 +410,11 @@ struct P2PMarketView: View {
                         )
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(String(format: "%.4f", trade.AmountCRB ?? 0)) CRB")
+                            Text("\(CRBUnits.formatDecimal(trade.AmountCRB ?? 0, maxFractionDigits: 4, minFractionDigits: 4)) CRB")
                                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                 .foregroundColor(CRBTheme.Colors.ink)
                             
-                            Text("@ \(CRBUnits.formatUSDT(trade.Price ?? 0)) (≈ \(CurrencyManager.formatFiat(Decimal(tradePriceInFiat), currencyCode: currency)))")
+                            Text("@ \(CRBUnits.formatUSDT(trade.Price ?? 0)) (≈ \(CurrencyManager.formatFiat(tradePriceInFiat, currencyCode: currency)))")
                                 .font(.system(size: 11))
                                 .foregroundColor(CRBTheme.Colors.muted)
                         }
@@ -426,7 +426,7 @@ struct P2PMarketView: View {
                                 .font(.system(size: 13, weight: .bold, design: .monospaced))
                                 .foregroundColor(CRBTheme.Colors.ink)
                             
-                            Text("≈ " + CurrencyManager.formatFiat(Decimal(valInFiat), currencyCode: currency))
+                            Text("≈ " + CurrencyManager.formatFiat(valInFiat, currencyCode: currency))
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(CRBTheme.Colors.muted)
                             
@@ -456,13 +456,13 @@ struct P2PMarketView: View {
                 let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
                 
                 let marketCapFiat = stats.market_cap_usdt.map {
-                    "≈ " + CurrencyManager.formatFiat(Decimal($0 * rate), currencyCode: currency)
+                    "≈ " + CurrencyManager.formatFiat($0 * Decimal(rate), currencyCode: currency)
                 }
                 let emissionUSDTFiat = stats.emission_24h_usdt.map {
-                    "≈ " + CurrencyManager.formatFiat(Decimal($0 * rate), currencyCode: currency)
+                    "≈ " + CurrencyManager.formatFiat($0 * Decimal(rate), currencyCode: currency)
                 }
                 let totalUSDTFiat = stats.volume_total_usdt.map {
-                    "≈ " + CurrencyManager.formatFiat(Decimal($0 * rate), currencyCode: currency)
+                    "≈ " + CurrencyManager.formatFiat($0 * Decimal(rate), currencyCode: currency)
                 }
                 
                 LazyVGrid(columns: [
@@ -473,9 +473,9 @@ struct P2PMarketView: View {
                     StatCard(icon: "coins", label: "Circulating Supply".localized, value: CRBUnits.formatLargeNumber(stats.circulating_supply_crb ?? 0) + " CRB", color: CRBTheme.Colors.violet)
                     StatCard(icon: "infinity", label: "Max Supply".localized, value: CRBUnits.formatLargeNumber(stats.max_supply_crb ?? 0) + " CRB", color: CRBTheme.Colors.info)
                     StatCard(icon: "percent", label: "Percent Mined".localized, value: String(format: "%.2f%%", stats.percent_mined ?? 0), color: CRBTheme.Colors.warning)
-                    StatCard(icon: "cube.fill", label: "Block Reward".localized, value: String(format: "%.0f CRB", stats.block_reward_crb ?? 0), color: CRBTheme.Colors.buyGreen)
+                    StatCard(icon: "cube.fill", label: "Block Reward".localized, value: CRBUnits.formatDecimal(stats.block_reward_crb ?? 0, maxFractionDigits: 0, minFractionDigits: 0) + " CRB", color: CRBTheme.Colors.buyGreen)
                     StatCard(icon: "clock", label: "Block Time".localized, value: "\(stats.block_time_secs ?? 60)s", color: CRBTheme.Colors.muted)
-                    StatCard(icon: "flame", label: "Emission 24h".localized, value: String(format: "%.0f CRB", stats.emission_24h_crb ?? 0), color: CRBTheme.Colors.sellRed)
+                    StatCard(icon: "flame", label: "Emission 24h".localized, value: CRBUnits.formatDecimal(stats.emission_24h_crb ?? 0, maxFractionDigits: 0, minFractionDigits: 0) + " CRB", color: CRBTheme.Colors.sellRed)
                     StatCard(icon: "dollarsign.circle", label: "Emission USDT".localized, value: CRBUnits.formatUSDT(stats.emission_24h_usdt ?? 0), color: CRBTheme.Colors.cyan, subtitle: emissionUSDTFiat)
                 }
                 

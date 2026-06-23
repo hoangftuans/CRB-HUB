@@ -11,7 +11,12 @@ enum MiningAPIClient {
     
     /// GET /pool/api/workers?addr=crb1... — per-rig breakdown for one address
     static func getWorkers(address: String) async throws -> WorkersResponse {
-        try await APIClient.get("\(APIConfig.poolAPI)/workers?addr=\(address)", type: WorkersResponse.self)
+        let url = try APIClient.makeURL(
+            base: APIConfig.poolAPI,
+            path: "workers",
+            queryItems: [URLQueryItem(name: "addr", value: address)]
+        )
+        return try await APIClient.get(url, type: WorkersResponse.self)
     }
     
     /// GET /pool/api/health — load balancer / liveness probe

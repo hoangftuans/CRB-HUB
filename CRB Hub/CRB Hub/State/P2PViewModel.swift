@@ -77,11 +77,11 @@ final class P2PViewModel {
                 reason: "Authenticate to sign P2P login challenge"
             )
             
-            // Step 3: Sign using domain-separated message (NOT challenge.msg)
-            // Client constructs: "cereblix-otc-login:v1:<nonce>"
-            // This prevents the server from tricking us into signing a transaction
+            // Step 3: Sign the exact OTC challenge msg after canonical validation.
+            // Expected format: "cereblix-otc-login|<nonce>".
             let signature = try WalletCore.signP2PLogin(
                 nonce: challenge.nonce,
+                message: challenge.msg,
                 privateKeyHex: privateKeyHex
             )
             
@@ -122,7 +122,7 @@ final class P2PViewModel {
             myTrades = try await t
         } catch {
             // Handle auth errors
-            if case CRBAPIError.unauthorized = error {
+            if case CRBAPIError.unauthorized(_) = error {
                 // Token expired
             }
         }

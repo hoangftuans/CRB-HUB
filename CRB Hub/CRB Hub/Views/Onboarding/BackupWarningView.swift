@@ -206,7 +206,6 @@ struct BackupWarningView: View {
 #Preview {
     NavigationStack {
         BackupWarningView(privateKeyHex: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2") {
-            print("Confirmed!")
         }
     }
 }

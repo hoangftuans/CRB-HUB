@@ -91,7 +91,9 @@ struct CreateWalletView: View {
                 icon: "sparkles",
                 isDisabled: isCreating || walletName.isEmpty
             ) {
-                createWallet()
+                Task {
+                    await createWallet()
+                }
             }
         }
     }
@@ -246,9 +248,10 @@ struct CreateWalletView: View {
     
     // MARK: - Actions
     
-    private func createWallet() {
+    private func createWallet() async {
         isCreating = true
         error = nil
+        defer { isCreating = false }
         
         do {
             // Generate wallet
@@ -261,7 +264,11 @@ struct CreateWalletView: View {
                 name: walletName.isEmpty ? "My Wallet" : walletName
             )
             
-            try KeychainStore.shared.savePrivateKey(privKey, for: wallet.id)
+            try await KeychainStore.shared.savePrivateKeyWithBiometricSetup(
+                privKey,
+                for: wallet.id,
+                reason: "Authenticate to protect this wallet with Face ID"
+            )
             KeychainStore.shared.saveWalletMetadata(wallet)
             
             // Update app state
@@ -275,8 +282,6 @@ struct CreateWalletView: View {
         } catch {
             self.error = error.localizedDescription
         }
-        
-        isCreating = false
     }
 }
 

@@ -5,11 +5,11 @@ struct USDTWalletManagerView: View {
     @State private var showAddSheet = false
     @State private var showGenerateSheet = false
     @State private var isRefreshing = false
-    
+
     var body: some View {
         ZStack {
             CRBTheme.Colors.background.ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: CRBTheme.Spacing.lg) {
                     // Header text
@@ -19,7 +19,7 @@ struct USDTWalletManagerView: View {
                             .foregroundColor(CRBTheme.Colors.muted)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    
+
                     if appState.linkedUSDTWallets.isEmpty {
                         EmptyStateView(
                             icon: "dollarsign.circle",
@@ -33,7 +33,7 @@ struct USDTWalletManagerView: View {
                             walletCard(wallet)
                         }
                     }
-                    
+
                     // Action Buttons
                     VStack(spacing: CRBTheme.Spacing.md) {
                         Button {
@@ -54,7 +54,7 @@ struct USDTWalletManagerView: View {
                                     .stroke(CRBTheme.Colors.cyan.opacity(0.3), lineWidth: 1)
                             )
                         }
-                        
+
                         Button {
                             showGenerateSheet = true
                         } label: {
@@ -93,9 +93,9 @@ struct USDTWalletManagerView: View {
             await appState.refreshUSDTBalances()
         }
     }
-    
+
     // MARK: - Wallet Card Component
-    
+
     private func walletCard(_ wallet: USDTWallet) -> some View {
         VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
             HStack {
@@ -111,12 +111,12 @@ struct USDTWalletManagerView: View {
                 .background(wallet.isNative ? CRBTheme.Colors.cyan.opacity(0.15) : CRBTheme.Colors.backgroundSecondary)
                 .foregroundColor(wallet.isNative ? CRBTheme.Colors.cyan : CRBTheme.Colors.muted)
                 .clipShape(Capsule())
-                
+
                 Spacer()
-                
+
                 // Network Badge
                 PillBadge(text: wallet.network.displayName, color: CRBTheme.Colors.violet)
-                
+
                 // Delete Button
                 Button(role: .destructive) {
                     withAnimation {
@@ -129,19 +129,19 @@ struct USDTWalletManagerView: View {
                 }
                 .padding(.leading, 4)
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(wallet.name)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(CRBTheme.Colors.ink)
-                
+
                 HStack(spacing: CRBTheme.Spacing.sm) {
                     Text(wallet.address)
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(CRBTheme.Colors.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    
+
                     Button {
                         UIPasteboard.general.string = wallet.address
                     } label: {
@@ -151,16 +151,16 @@ struct USDTWalletManagerView: View {
                     }
                 }
             }
-            
+
             Divider().background(CRBTheme.Colors.cardBorder)
-            
+
             HStack {
                 Text("USDT Balance".localized)
                     .font(.system(size: 12))
                     .foregroundColor(CRBTheme.Colors.muted)
-                
+
                 Spacer()
-                
+
                 Text(String(format: "%.2f USDT", (wallet.balance as NSDecimalNumber).doubleValue))
                     .font(.system(size: 18, weight: .heavy, design: .monospaced))
                     .foregroundColor(CRBTheme.Colors.cyan)
@@ -181,30 +181,30 @@ struct USDTWalletManagerView: View {
 struct AddUSDTWalletSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    
+
     @State private var name = ""
     @State private var provider: USDTProvider = .binance
     @State private var network: USDTNetwork = .bep20
     @State private var address = ""
     @State private var validationError: String?
-    
+
     var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !address.trimmingCharacters(in: .whitespaces).isEmpty
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 CRBTheme.Colors.background.ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: CRBTheme.Spacing.xl) {
                         VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                             Text("Wallet Name".localized)
                                 .font(CRBTheme.Typography.caption())
                                 .foregroundColor(CRBTheme.Colors.muted)
-                            
+
                             TextField("e.g. My Binance Wallet", text: $name)
                                 .textFieldStyle(.plain)
                                 .foregroundColor(CRBTheme.Colors.ink)
@@ -212,12 +212,12 @@ struct AddUSDTWalletSheet: View {
                                 .background(CRBTheme.Colors.backgroundSecondary)
                                 .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
                         }
-                        
+
                         VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                             Text("Provider".localized)
                                 .font(CRBTheme.Typography.caption())
                                 .foregroundColor(CRBTheme.Colors.muted)
-                            
+
                             Picker("Provider", selection: $provider) {
                                 ForEach(USDTProvider.allCases.filter { $0 != .native }) { prov in
                                     Text(prov.rawValue).tag(prov)
@@ -230,12 +230,12 @@ struct AddUSDTWalletSheet: View {
                             .background(CRBTheme.Colors.backgroundSecondary)
                             .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
                         }
-                        
+
                         VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                             Text("Network".localized)
                                 .font(CRBTheme.Typography.caption())
                                 .foregroundColor(CRBTheme.Colors.muted)
-                            
+
                             Picker("Network", selection: $network) {
                                 ForEach(USDTNetwork.allCases) { net in
                                     Text(net.displayName).tag(net)
@@ -248,12 +248,12 @@ struct AddUSDTWalletSheet: View {
                             .background(CRBTheme.Colors.backgroundSecondary)
                             .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
                         }
-                        
+
                         VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                             Text("USDT Address".localized)
                                 .font(CRBTheme.Typography.caption())
                                 .foregroundColor(CRBTheme.Colors.muted)
-                            
+
                             TextField("Paste USDT address...", text: $address)
                                 .textFieldStyle(.plain)
                                 .foregroundColor(CRBTheme.Colors.ink)
@@ -264,13 +264,13 @@ struct AddUSDTWalletSheet: View {
                                 .background(CRBTheme.Colors.backgroundSecondary)
                                 .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
                         }
-                        
+
                         if let error = validationError {
                             Text(error)
                                 .font(.system(size: 13))
                                 .foregroundColor(CRBTheme.Colors.error)
                         }
-                        
+
                         GradientButton(title: "Save Linked Wallet".localized, icon: "link.circle.fill", isDisabled: !isValid) {
                             saveWallet()
                         }
@@ -290,11 +290,11 @@ struct AddUSDTWalletSheet: View {
             }
         }
     }
-    
+
     private func saveWallet() {
         validationError = nil
         let cleanAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         // Basic Address validation
         if network == .trc20 {
             guard cleanAddress.hasPrefix("T") && cleanAddress.count == 34 else {
@@ -307,7 +307,7 @@ struct AddUSDTWalletSheet: View {
                 return
             }
         }
-        
+
         let newWallet = USDTWallet(
             name: name,
             provider: provider,
@@ -325,18 +325,19 @@ struct AddUSDTWalletSheet: View {
 struct GenerateNativeUSDTSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    
+
     @State private var name = ""
     @State private var network: USDTNetwork = .bep20
     @State private var generatedWallet: (privateKey: String, address: String)?
     @State private var isCreating = false
     @State private var copiedKey = false
-    
+    @State private var error: String?
+
     var body: some View {
         NavigationStack {
             ZStack {
                 CRBTheme.Colors.background.ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: CRBTheme.Spacing.xl) {
                         if generatedWallet != nil {
@@ -362,9 +363,9 @@ struct GenerateNativeUSDTSheet: View {
             }
         }
     }
-    
+
     // MARK: - Success Content (extracted to help type-checker)
-    
+
     @ViewBuilder
     private var successContent: some View {
         if let wallet = generatedWallet {
@@ -372,11 +373,11 @@ struct GenerateNativeUSDTSheet: View {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 60))
                     .foregroundColor(CRBTheme.Colors.buyGreen)
-                
+
                 Text("Wallet Created Successfully!".localized)
                     .font(CRBTheme.Typography.title())
                     .foregroundColor(CRBTheme.Colors.ink)
-                
+
                 // Warning box
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -389,13 +390,13 @@ struct GenerateNativeUSDTSheet: View {
                 .padding(CRBTheme.Spacing.md)
                 .background(CRBTheme.Colors.warning.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
-                
+
                 // Address box
                 VStack(alignment: .leading, spacing: 4) {
                     Text("EVM Wallet Address".localized)
                         .font(.system(size: 11))
                         .foregroundColor(CRBTheme.Colors.muted)
-                    
+
                     HStack {
                         Text(wallet.address)
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
@@ -414,13 +415,13 @@ struct GenerateNativeUSDTSheet: View {
                     .background(CRBTheme.Colors.backgroundSecondary)
                     .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
                 }
-                
+
                 // Private key box
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Private Key".localized)
                         .font(.system(size: 11))
                         .foregroundColor(CRBTheme.Colors.muted)
-                    
+
                     HStack {
                         Text(wallet.privateKey)
                             .font(.system(size: 11, design: .monospaced))
@@ -447,7 +448,7 @@ struct GenerateNativeUSDTSheet: View {
                             .stroke(CRBTheme.Colors.error.opacity(0.2), lineWidth: 1)
                     )
                 }
-                
+
                 GradientButton(title: "Done".localized, icon: "checkmark.circle.fill") {
                     dismiss()
                 }
@@ -456,16 +457,16 @@ struct GenerateNativeUSDTSheet: View {
             .padding(CRBTheme.Spacing.xl)
         }
     }
-    
+
     // MARK: - Form Content (extracted to help type-checker)
-    
+
     private var formContent: some View {
         VStack(spacing: CRBTheme.Spacing.lg) {
             VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                 Text("Wallet Name".localized)
                     .font(CRBTheme.Typography.caption())
                     .foregroundColor(CRBTheme.Colors.muted)
-                
+
                 TextField("e.g. My Native USDT Wallet", text: $name)
                     .textFieldStyle(.plain)
                     .foregroundColor(CRBTheme.Colors.ink)
@@ -473,12 +474,12 @@ struct GenerateNativeUSDTSheet: View {
                     .background(CRBTheme.Colors.backgroundSecondary)
                     .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
             }
-            
+
             VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                 Text("Network".localized)
                     .font(CRBTheme.Typography.caption())
                     .foregroundColor(CRBTheme.Colors.muted)
-                
+
                 Picker("Network", selection: $network) {
                     // TRC20 not supported for native gen since TRON requires a different key format than EVM
                     ForEach(USDTNetwork.allCases.filter { $0 != .trc20 }) { net in
@@ -492,24 +493,38 @@ struct GenerateNativeUSDTSheet: View {
                 .background(CRBTheme.Colors.backgroundSecondary)
                 .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
             }
-            
+
             Text("Note: The generated wallet uses standard SECP256k1 encryption. It resides entirely on-device and is stored inside the secure iOS Keychain.".localized)
                 .font(.system(size: 11))
                 .foregroundColor(CRBTheme.Colors.muted)
                 .padding(.vertical, 4)
-            
-            GradientButton(title: "Generate Keys".localized, icon: "iphone.gen3", isDisabled: name.trimmingCharacters(in: .whitespaces).isEmpty) {
-                generateWallet()
+
+            if let error {
+                Text(error)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.error)
+            }
+
+            GradientButton(
+                title: isCreating ? "Creating...".localized : "Generate Keys".localized,
+                icon: "iphone.gen3",
+                isDisabled: isCreating || name.trimmingCharacters(in: .whitespaces).isEmpty
+            ) {
+                Task {
+                    await generateWallet()
+                }
             }
         }
     }
-    
-    private func generateWallet() {
+
+    private func generateWallet() async {
         isCreating = true
-        
+        error = nil
+        defer { isCreating = false }
+
         // Generate keys
         let walletData = NativeUSDTGenerator.generate()
-        
+
         let newWallet = USDTWallet(
             name: name,
             provider: .native,
@@ -517,14 +532,22 @@ struct GenerateNativeUSDTSheet: View {
             address: walletData.address,
             isNative: true
         )
-        
+
         // Save private key in Keychain
-        try? KeychainStore.shared.savePrivateKey(walletData.privateKey, for: newWallet.id)
-        
+        do {
+            try await KeychainStore.shared.savePrivateKeyWithBiometricSetup(
+                walletData.privateKey,
+                for: newWallet.id,
+                reason: "Authenticate to protect this USDT wallet with Face ID"
+            )
+        } catch {
+            self.error = error.localizedDescription
+            return
+        }
+
         appState.addUSDTWallet(newWallet)
-        
+
         generatedWallet = walletData
-        isCreating = false
     }
 }
 
@@ -535,11 +558,11 @@ struct NativeUSDTGenerator {
         var pKeyBytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, pKeyBytes.count, &pKeyBytes)
         let privateKey = pKeyBytes.map { String(format: "%02x", $0) }.joined()
-        
+
         var addrBytes = [UInt8](repeating: 0, count: 20)
         _ = SecRandomCopyBytes(kSecRandomDefault, addrBytes.count, &addrBytes)
         let address = "0x" + addrBytes.map { String(format: "%02x", $0) }.joined()
-        
+
         return (privateKey, address)
     }
 }

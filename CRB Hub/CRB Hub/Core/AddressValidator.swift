@@ -1,12 +1,15 @@
 import Foundation
 
 /// CRB address validation and input sanitization
-/// Format: crb1 + 40 hex characters (case-insensitive)
+/// Format: crb1 + 40 lowercase hex characters.
 enum AddressValidator {
-    private static let addressPattern = "^crb1[0-9a-fA-F]{40}$"
+    private static let addressPattern = "^crb1[0-9a-f]{40}$"
     
     /// Validate a CRB address
     static func isValidAddress(_ address: String) -> Bool {
+        guard address == sanitizeSingleLine(address) else {
+            return false
+        }
         guard let regex = try? NSRegularExpression(pattern: addressPattern) else {
             return false
         }
@@ -48,4 +51,3 @@ enum AddressValidator {
         return cleaned.replacingOccurrences(of: "\n", with: "")
     }
 }
-

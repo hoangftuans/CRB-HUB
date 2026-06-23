@@ -5,25 +5,25 @@ import Foundation
 /// Response from GET /otc/stats
 struct P2PStats: Codable {
     let pair: String?
-    let price_usdt: Double?
+    let price_usdt: Decimal?
     let change_24h_pct: Double?
     let change_7d_pct: Double?
-    let high_24h_usdt: Double?
-    let low_24h_usdt: Double?
-    let volume_24h_crb: Double?
-    let volume_24h_usdt: Double?
+    let high_24h_usdt: Decimal?
+    let low_24h_usdt: Decimal?
+    let volume_24h_crb: Decimal?
+    let volume_24h_usdt: Decimal?
     let trades_24h: Int?
-    let volume_total_crb: Double?
-    let volume_total_usdt: Double?
+    let volume_total_crb: Decimal?
+    let volume_total_usdt: Decimal?
     let trades_total: Int?
-    let market_cap_usdt: Double?
-    let circulating_supply_crb: Double?
-    let max_supply_crb: Double?
+    let market_cap_usdt: Decimal?
+    let circulating_supply_crb: Decimal?
+    let max_supply_crb: Decimal?
     let percent_mined: Double?
-    let block_reward_crb: Double?
+    let block_reward_crb: Decimal?
     let block_time_secs: Int?
-    let emission_24h_crb: Double?
-    let emission_24h_usdt: Double?
+    let emission_24h_crb: Decimal?
+    let emission_24h_usdt: Decimal?
     let updated: Int?
 }
 
@@ -33,9 +33,9 @@ struct P2PRecentTrade: Codable, Identifiable {
     
     let Side: String?
     let Rail: String?
-    let AmountCRB: Double?
-    let AmountUSDT: Double?
-    let Price: Double?
+    let AmountCRB: Decimal?
+    let AmountUSDT: Decimal?
+    let Price: Decimal?
     let Olympus: Bool?
     let Time: Int?
     
@@ -53,9 +53,9 @@ struct P2POffer: Codable, Identifiable {
     let ID: String
     let Side: String?
     let Rail: String?
-    let Price: Double?
-    let MinCRB: Double?
-    let MaxCRB: Double?
+    let Price: Decimal?
+    let MinCRB: Decimal?
+    let MaxCRB: Decimal?
     let Info: String?
     let Olympus: Bool?
     
@@ -110,9 +110,9 @@ struct P2PTrade: Codable, Identifiable {
     let ID: String?
     let Side: String?
     let Rail: String?
-    let Price: Double?
-    let AmountCRB: Double?
-    let AmountUSDT: Double?
+    let Price: Decimal?
+    let AmountCRB: Decimal?
+    let AmountUSDT: Decimal?
     let State: String?
     let MakerAddr: String?
     let TakerAddr: String?
@@ -183,9 +183,9 @@ struct P2PChatMessage: Codable, Identifiable {
 struct CreateOfferRequest: Codable {
     let side: String
     let rail: String
-    let price: Double
-    let minCRB: Double
-    let maxCRB: Double
+    let price: Decimal
+    let minCRB: Decimal
+    let maxCRB: Decimal
     let makerUSDT: String?
     let info: String?
     let readySecs: Int?
@@ -195,7 +195,7 @@ struct CreateOfferRequest: Codable {
 // MARK: - Take Offer Request
 struct TakeOfferRequest: Codable {
     let offerID: String
-    let amount: Double
+    let amount: Decimal
     let takerUSDT: String?
     let info: String?
 }

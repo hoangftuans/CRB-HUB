@@ -100,7 +100,12 @@ enum P2PAPIClient {
     /// GET /otc/trade?id= — trade detail
     static func getTrade(token: String, tradeId: String) async throws -> P2PTrade {
         guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
-        return try await APIClient.getAuth("\(APIConfig.p2pAPI)/trade?id=\(tradeId)", token: token, type: P2PTrade.self)
+        let url = try APIClient.makeURL(
+            base: APIConfig.p2pAPI,
+            path: "trade",
+            queryItems: [URLQueryItem(name: "id", value: tradeId)]
+        )
+        return try await APIClient.getAuth(url, token: token, type: P2PTrade.self)
     }
     
     /// GET /otc/mytrades — all my trades
@@ -140,7 +145,12 @@ enum P2PAPIClient {
     
     /// GET /otc/chat?id= — read trade chat
     static func getChat(token: String, tradeId: String) async throws -> [P2PChatMessage] {
-        try await APIClient.getAuth("\(APIConfig.p2pAPI)/chat?id=\(tradeId)", token: token, type: [P2PChatMessage].self)
+        let url = try APIClient.makeURL(
+            base: APIConfig.p2pAPI,
+            path: "chat",
+            queryItems: [URLQueryItem(name: "id", value: tradeId)]
+        )
+        return try await APIClient.getAuth(url, token: token, type: [P2PChatMessage].self)
     }
     
     /// POST /otc/chat — send chat message

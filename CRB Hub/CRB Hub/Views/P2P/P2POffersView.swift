@@ -70,18 +70,18 @@ struct P2POffersView: View {
                         let currency = appState.selectedFiatCurrency
                         let rates = appState.cachedFXRates
                         let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
-                        let offerPriceFiat = (offer.Price ?? 0) * rate
+                        let offerPriceFiat = (offer.Price ?? 0) * Decimal(rate)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(CRBUnits.formatUSDT(offer.Price ?? 0))
                                 .font(.system(size: 14, weight: .bold, design: .monospaced))
                                 .foregroundColor(CRBTheme.Colors.ink)
                             
-                            Text("≈ " + CurrencyManager.formatFiat(Decimal(offerPriceFiat), currencyCode: currency))
+                            Text("≈ " + CurrencyManager.formatFiat(offerPriceFiat, currencyCode: currency))
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(CRBTheme.Colors.muted)
                             
-                            Text("\(String(format: "%.2f", offer.MinCRB ?? 0)) - \(String(format: "%.2f", offer.MaxCRB ?? 0)) CRB")
+                            Text("\(CRBUnits.formatDecimal(offer.MinCRB ?? 0, maxFractionDigits: 2, minFractionDigits: 2)) - \(CRBUnits.formatDecimal(offer.MaxCRB ?? 0, maxFractionDigits: 2, minFractionDigits: 2)) CRB")
                                 .font(.system(size: 11))
                                 .foregroundColor(CRBTheme.Colors.muted.opacity(0.8))
                         }
@@ -134,11 +134,11 @@ struct P2POffersView: View {
                                             color: trade.Side == "sell_crb" ? CRBTheme.Colors.sellRed : CRBTheme.Colors.buyGreen)
                                 }
                                 
-                                Text("\(String(format: "%.4f", trade.AmountCRB ?? 0)) CRB @ \(CRBUnits.formatUSDT(trade.Price ?? 0))")
+                                Text("\(CRBUnits.formatDecimal(trade.AmountCRB ?? 0, maxFractionDigits: 4, minFractionDigits: 4)) CRB @ \(CRBUnits.formatUSDT(trade.Price ?? 0))")
                                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                                     .foregroundColor(CRBTheme.Colors.ink)
                                 
-                                Text("≈ " + CurrencyManager.formatFiat(Decimal((trade.AmountUSDT ?? 0) * rate), currencyCode: currency))
+                                Text("≈ " + CurrencyManager.formatFiat((trade.AmountUSDT ?? 0) * Decimal(rate), currencyCode: currency))
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundColor(CRBTheme.Colors.muted)
                             }
@@ -295,11 +295,14 @@ struct P2POffersView: View {
     }
     
     private func createOffer() {
-        guard let price = Double(offerPrice),
-              let maxCRB = Double(offerMaxCRB) else {
+        guard let price = Decimal(string: offerPrice),
+              let maxCRB = Decimal(string: offerMaxCRB),
+              price > 0,
+              maxCRB > 0 else {
             createOfferError = "Invalid price or amount"
             return
         }
+        let minCRB = Decimal(string: offerMinCRB) ?? 0
         
         isCreatingOffer = true
         createOfferError = nil
@@ -311,7 +314,7 @@ struct P2POffersView: View {
                         side: offerSide,
                         rail: offerRail,
                         price: price,
-                        minCRB: Double(offerMinCRB) ?? 0,
+                        minCRB: minCRB,
                         maxCRB: maxCRB,
                         makerUSDT: offerMakerUSDT.isEmpty ? nil : offerMakerUSDT,
                         info: offerInfo.isEmpty ? nil : offerInfo,

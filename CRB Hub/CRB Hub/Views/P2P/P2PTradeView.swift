@@ -68,8 +68,8 @@ struct P2PTradeView: View {
         let rates = appState.cachedFXRates
         let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
         let price = trade.Price ?? 0
-        let priceInFiat = price * rate
-        let amountInFiat = (trade.AmountUSDT ?? 0) * rate
+        let priceInFiat = price * Decimal(rate)
+        let amountInFiat = (trade.AmountUSDT ?? 0) * Decimal(rate)
         
         return VStack(spacing: CRBTheme.Spacing.md) {
             HStack {
@@ -79,17 +79,17 @@ struct P2PTradeView: View {
                 PillBadge(text: trade.Rail?.capitalized ?? "—", color: CRBTheme.Colors.violet)
             }
             
-            Text("\(String(format: "%.4f", trade.AmountCRB ?? 0)) CRB")
+            Text("\(CRBUnits.formatDecimal(trade.AmountCRB ?? 0, maxFractionDigits: 4, minFractionDigits: 4)) CRB")
                 .font(.system(size: 28, weight: .heavy, design: .monospaced))
                 .foregroundStyle(CRBTheme.Gradients.primary)
             
-            FiatValueView(crbAmount: Decimal(trade.AmountCRB ?? 0))
+            FiatValueView(crbAmount: trade.AmountCRB ?? 0)
             
-            Text("@ \(CRBUnits.formatUSDT(price)) per CRB (≈ \(CurrencyManager.formatFiat(Decimal(priceInFiat), currencyCode: currency)))")
+            Text("@ \(CRBUnits.formatUSDT(price)) per CRB (≈ \(CurrencyManager.formatFiat(priceInFiat, currencyCode: currency)))")
                 .font(.system(size: 14))
                 .foregroundColor(CRBTheme.Colors.muted)
             
-            Text("= \(CRBUnits.formatUSDT(trade.AmountUSDT ?? 0)) (≈ \(CurrencyManager.formatFiat(Decimal(amountInFiat), currencyCode: currency)))")
+            Text("= \(CRBUnits.formatUSDT(trade.AmountUSDT ?? 0)) (≈ \(CurrencyManager.formatFiat(amountInFiat, currencyCode: currency)))")
                 .font(.system(size: 18, weight: .bold, design: .monospaced))
                 .foregroundColor(CRBTheme.Colors.ink)
         }
@@ -157,8 +157,8 @@ struct P2PTradeView: View {
         let rates = appState.cachedFXRates
         let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
         let price = trade.Price ?? 0
-        let priceInFiat = price * rate
-        let amountInFiat = (trade.AmountUSDT ?? 0) * rate
+        let priceInFiat = price * Decimal(rate)
+        let amountInFiat = (trade.AmountUSDT ?? 0) * Decimal(rate)
         
         return VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
             SectionHeader(title: "Details".localized, icon: "doc.text")
@@ -166,9 +166,9 @@ struct P2PTradeView: View {
             detailRow("Trade ID".localized, trade.ID ?? "—")
             detailRow("Side".localized, trade.Side == "sell_crb" ? "Sell Offers".localized : "Buy Offers".localized)
             detailRow("Rail".localized, trade.Rail?.capitalized ?? "—")
-            detailRow("Price".localized, "\(CRBUnits.formatUSDT(price)) (≈ \(CurrencyManager.formatFiat(Decimal(priceInFiat), currencyCode: currency)))")
-            detailRow("Amount".localized, String(format: "%.8f", trade.AmountCRB ?? 0))
-            detailRow("Amount USDT".localized, "\(CRBUnits.formatUSDT(trade.AmountUSDT ?? 0)) (≈ \(CurrencyManager.formatFiat(Decimal(amountInFiat), currencyCode: currency)))")
+            detailRow("Price".localized, "\(CRBUnits.formatUSDT(price)) (≈ \(CurrencyManager.formatFiat(priceInFiat, currencyCode: currency)))")
+            detailRow("Amount".localized, CRBUnits.formatDecimal(trade.AmountCRB ?? 0, maxFractionDigits: 8, minFractionDigits: 0))
+            detailRow("Amount USDT".localized, "\(CRBUnits.formatUSDT(trade.AmountUSDT ?? 0)) (≈ \(CurrencyManager.formatFiat(amountInFiat, currencyCode: currency)))")
             
             if let created = trade.Created {
                 detailRow("Time".localized, CRBUnits.formatDate(created))
@@ -339,7 +339,7 @@ struct P2PTradeView: View {
             let myLocked = isSeller ? (trade.CRBLocked ?? false) : (trade.USDTFunded ?? false)
             let otherLocked = isSeller ? (trade.USDTFunded ?? false) : (trade.CRBLocked ?? false)
             let escrowAddr = (isSeller ? trade.EscrowCRB : trade.EscrowUSDT) ?? ""
-            let amountStr = isSeller ? "\(String(format: "%.4f", trade.AmountCRB ?? 0))" : "\(String(format: "%.6f", trade.AmountUSDT ?? 0))"
+            let amountStr = isSeller ? CRBUnits.formatDecimal(trade.AmountCRB ?? 0, maxFractionDigits: 4, minFractionDigits: 4) : CRBUnits.formatDecimal(trade.AmountUSDT ?? 0, maxFractionDigits: 6, minFractionDigits: 6)
             let assetName = isSeller ? "CRB" : "USDT"
             
             VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
@@ -563,7 +563,7 @@ struct P2PTradeView: View {
         }
     }
     
-    private func simulateNativeUSDTTransfer(wallet: USDTWallet, escrowAddr: String, amount: Double) {
+    private func simulateNativeUSDTTransfer(wallet: USDTWallet, escrowAddr: String, amount: Decimal) {
         var txBytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, txBytes.count, &txBytes)
         usdtTransferTxHash = "0x" + txBytes.map { String(format: "%02x", $0) }.joined()

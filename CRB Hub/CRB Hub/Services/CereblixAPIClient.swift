@@ -11,20 +11,36 @@ enum CereblixAPIClient {
     
     /// GET /api/balance?addr=crb1... — balance and account info
     static func getBalance(address: String) async throws -> BalanceResponse {
-        try await APIClient.get("\(APIConfig.walletAPI)/balance?addr=\(address)", type: BalanceResponse.self)
+        let url = try APIClient.makeURL(
+            base: APIConfig.walletAPI,
+            path: "balance",
+            queryItems: [URLQueryItem(name: "addr", value: address)]
+        )
+        return try await APIClient.get(url, type: BalanceResponse.self)
     }
     
     /// GET /api/history?addr=crb1...&limit=50&offset=0 — transaction history
     static func getHistory(address: String, limit: Int = 50, offset: Int = 0) async throws -> [CRBTransaction] {
-        try await APIClient.get(
-            "\(APIConfig.walletAPI)/history?addr=\(address)&limit=\(limit)&offset=\(offset)",
-            type: [CRBTransaction].self
+        let url = try APIClient.makeURL(
+            base: APIConfig.walletAPI,
+            path: "history",
+            queryItems: [
+                URLQueryItem(name: "addr", value: address),
+                URLQueryItem(name: "limit", value: String(limit)),
+                URLQueryItem(name: "offset", value: String(offset)),
+            ]
         )
+        return try await APIClient.get(url, type: [CRBTransaction].self)
     }
     
     /// GET /api/tx?id=<txid> — look up a transaction
     static func getTransaction(txid: String) async throws -> CRBTransaction {
-        try await APIClient.get("\(APIConfig.walletAPI)/tx?id=\(txid)", type: CRBTransaction.self)
+        let url = try APIClient.makeURL(
+            base: APIConfig.walletAPI,
+            path: "tx",
+            queryItems: [URLQueryItem(name: "id", value: txid)]
+        )
+        return try await APIClient.get(url, type: CRBTransaction.self)
     }
     
     /// POST /api/tx — broadcast a signed transaction
