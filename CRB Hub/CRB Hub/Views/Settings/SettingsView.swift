@@ -363,6 +363,21 @@ struct SettingsView: View {
                     .background(copiedDonationAddress ? CRBTheme.Colors.success.opacity(0.1) : CRBTheme.Colors.cyan.opacity(0.1))
                     .clipShape(Capsule())
                 }
+                
+                NavigationLink {
+                    SendView(prefilledAddress: donationAddress)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "paperplane.fill")
+                        Text("Send".localized)
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(hex: 0x06121F))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(CRBTheme.Colors.cyan)
+                    .clipShape(Capsule())
+                }
             }
             .padding(CRBTheme.Spacing.sm)
             .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))

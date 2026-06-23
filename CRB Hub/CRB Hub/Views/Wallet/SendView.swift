@@ -13,6 +13,10 @@ struct SendView: View {
     @State private var error: String?
     @State private var sendResult: BroadcastResult?
     
+    init(prefilledAddress: String = "") {
+        _recipientAddress = State(initialValue: prefilledAddress)
+    }
+    
     var isValidAddress: Bool {
         AddressValidator.isValidAddress(recipientAddress)
     }
