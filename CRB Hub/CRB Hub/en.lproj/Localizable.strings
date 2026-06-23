@@ -243,3 +243,9 @@
 "Your deposit is locked in escrow ✓" = "Your deposit is locked in escrow ✓";
 "Counterparty Deposit" = "Counterparty Deposit";
 
+/* About Section */
+"Developer" = "Developer";
+"Contact" = "Contact";
+"License" = "License";
+"MIT License" = "MIT License";
+

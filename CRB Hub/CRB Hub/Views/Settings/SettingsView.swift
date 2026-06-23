@@ -440,6 +440,37 @@ struct SettingsView: View {
             
             Divider().background(CRBTheme.Colors.cardBorder)
             
+            HStack {
+                Text("Developer".localized)
+                    .foregroundColor(CRBTheme.Colors.muted)
+                Spacer()
+                Text("Hoang Tuan Nguyen")
+                    .foregroundColor(CRBTheme.Colors.ink)
+                    .fontWeight(.semibold)
+            }
+            .font(.system(size: 13))
+            
+            HStack {
+                Text("Contact".localized)
+                    .foregroundColor(CRBTheme.Colors.muted)
+                Spacer()
+                Text("nguyenminh044331@gmail.com")
+                    .foregroundColor(CRBTheme.Colors.cyan)
+                    .font(.system(size: 13, design: .monospaced))
+            }
+            .font(.system(size: 13))
+            
+            HStack {
+                Text("License".localized)
+                    .foregroundColor(CRBTheme.Colors.muted)
+                Spacer()
+                Text("MIT License".localized)
+                    .foregroundColor(CRBTheme.Colors.ink)
+            }
+            .font(.system(size: 13))
+            
+            Divider().background(CRBTheme.Colors.cardBorder)
+            
             Text("CRB Hub is a non-custodial wallet. Your private keys are stored locally on your device and never transmitted to any server. Always backup your private keys.".localized)
                 .font(.system(size: 11))
                 .foregroundColor(CRBTheme.Colors.muted.opacity(0.7))

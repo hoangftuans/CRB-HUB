@@ -243,3 +243,9 @@
 "Your deposit is locked in escrow ✓" = "Khoản nạp của bạn đã được khóa an toàn ✓";
 "Counterparty Deposit" = "Khoản nạp của đối tác";
 
+/* About Section */
+"Developer" = "Nhà phát triển";
+"Contact" = "Liên hệ";
+"License" = "Giấy phép";
+"MIT License" = "Giấy phép MIT";
+
