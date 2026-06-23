@@ -249,3 +249,49 @@
 "License" = "Giấy phép";
 "MIT License" = "Giấy phép MIT";
 
+/* USDT Wallet Manager & Live P2P */
+"Manage your USDT balances across exchanges and Web3 wallets." = "Quản lý số dư USDT của bạn trên các sàn giao dịch và ví Web3.";
+"No USDT Wallets" = "Không có ví USDT nào";
+"Link your exchange accounts or Web3 wallets to track and pay P2P escrows." = "Liên kết ví sàn hoặc ví Web3 để theo dõi và thanh toán ký quỹ P2P.";
+"Link Existing Wallet / Exchange" = "Liên kết Ví / Tài khoản Sàn có sẵn";
+"Create Native USDT Wallet" = "Tạo Ví USDT Nội bộ Mới";
+"USDT Wallet Manager" = "Quản lý Ví USDT";
+"Provider" = "Nhà cung cấp";
+"Network" = "Mạng lưới";
+"USDT Address" = "Địa chỉ USDT";
+"USDT Balance" = "Số dư USDT";
+"Wallet Name" = "Tên ví";
+"Save Linked Wallet" = "Lưu ví liên kết";
+"Link USDT Wallet" = "Liên kết ví USDT";
+"Cancel" = "Hủy";
+"EVM Wallet Address" = "Địa chỉ ví EVM";
+"Private Key" = "Khóa bảo mật";
+"New Native USDT Wallet" = "Ví USDT Nội bộ Mới";
+"Generate Keys" = "Tạo khóa ví";
+"Live Sync" = "Live Sync";
+"Search by payment network..." = "Tìm kiếm theo mạng thanh toán...";
+"Linked USDT Wallets Available:" = "Các ví USDT khả dụng:";
+"Pay via %@" = "Thanh toán bằng %@";
+"Withdraw from %@" = "Rút tiền từ %@";
+"Transfer Sent" = "Đã gửi giao dịch";
+"Your USDT transfer has been signed and broadcast.\nTx: %@" = "Giao dịch chuyển USDT của bạn đã được ký và phát lên mạng lưới.\nTx: %@";
+"Tron addresses must start with 'T' and be 34 characters." = "Địa chỉ Tron phải bắt đầu bằng chữ T và có độ dài 34 ký tự.";
+"EVM addresses must start with '0x' and be 42 characters." = "Địa chỉ EVM phải bắt đầu bằng '0x' và có độ dài 42 ký tự.";
+"Wallet Created Successfully!" = "Đã tạo ví thành công!";
+"Write down your private key and keep it safe. If you lose it, you will lose access to your funds forever." = "Vui lòng sao lưu khóa bảo mật này ở nơi an toàn. Nếu bạn làm mất, bạn sẽ vĩnh viễn không thể khôi phục lại tài sản.";
+"Note: The generated wallet uses standard SECP256k1 encryption. It resides entirely on-device and is stored inside the secure iOS Keychain." = "Lưu ý: Ví được tạo bằng chuẩn mã hóa SECP256k1. Ví nằm hoàn toàn trên thiết bị và lưu trữ trong Keychain an toàn.";
+"Manage, generate, and link your USDT wallets for P2P trading." = "Quản lý, tạo mới và liên kết ví USDT để giao dịch P2P.";
+"Open USDT Wallet Manager" = "Mở Quản lý Ví USDT";
+"Binance" = "Binance";
+"OKX" = "OKX";
+"Bybit" = "Bybit";
+"Coinbase" = "Coinbase";
+"MetaMask" = "MetaMask";
+"Trust Wallet" = "Trust Wallet";
+"Native Wallet" = "Ví nội bộ";
+"Withdraw from Binance" = "Rút tiền từ Binance";
+"Withdraw from OKX" = "Rút tiền từ OKX";
+"Withdraw from Bybit" = "Rút tiền từ Bybit";
+"Withdraw from Coinbase" = "Rút tiền từ Coinbase";
+
+

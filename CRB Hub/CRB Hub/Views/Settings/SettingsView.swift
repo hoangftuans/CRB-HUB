@@ -33,6 +33,9 @@ struct SettingsView: View {
                         // Currency & Region
                         currencySection
                         
+                        // USDT Wallets
+                        usdtWalletSection
+                        
                         // Support Developer
                         donateSection
                         
@@ -322,6 +325,37 @@ struct SettingsView: View {
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .foregroundColor(CRBTheme.Colors.cyan)
                 }
+            }
+        }
+        .glassCard()
+    }
+    
+    // MARK: - USDT Wallets
+    
+    private var usdtWalletSection: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            SectionHeader(title: "USDT Wallet Manager".localized, icon: "dollarsign.circle.fill")
+            
+            Text("Manage, generate, and link your USDT wallets for P2P trading.".localized)
+                .font(.system(size: 13))
+                .foregroundColor(CRBTheme.Colors.muted)
+            
+            NavigationLink {
+                USDTWalletManagerView()
+            } label: {
+                HStack {
+                    Image(systemName: "wallet.pass.fill")
+                    Text("Open USDT Wallet Manager".localized)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.cyan.opacity(0.08))
+                .foregroundColor(CRBTheme.Colors.cyan)
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
             }
         }
         .glassCard()

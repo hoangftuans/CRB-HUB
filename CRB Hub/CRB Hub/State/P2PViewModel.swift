@@ -12,6 +12,7 @@ final class P2PViewModel {
     var state: P2PState?
     var isLoadingPublic = false
     var publicError: String?
+    var priceHistory: [Double] = [0.102, 0.105, 0.101, 0.108, 0.112, 0.109, 0.115, 0.118, 0.120, 0.116, 0.124, 0.128]
     
     // MARK: - Auth
     var isLoggingIn = false
@@ -182,7 +183,7 @@ final class P2PViewModel {
         stopAutoRefresh()
         refreshTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { return }
                 await loadPublicData()
             }

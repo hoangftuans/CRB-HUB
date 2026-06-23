@@ -249,3 +249,49 @@
 "License" = "License";
 "MIT License" = "MIT License";
 
+/* USDT Wallet Manager & Live P2P */
+"Manage your USDT balances across exchanges and Web3 wallets." = "Manage your USDT balances across exchanges and Web3 wallets.";
+"No USDT Wallets" = "No USDT Wallets";
+"Link your exchange accounts or Web3 wallets to track and pay P2P escrows." = "Link your exchange accounts or Web3 wallets to track and pay P2P escrows.";
+"Link Existing Wallet / Exchange" = "Link Existing Wallet / Exchange";
+"Create Native USDT Wallet" = "Create Native USDT Wallet";
+"USDT Wallet Manager" = "USDT Wallet Manager";
+"Provider" = "Provider";
+"Network" = "Network";
+"USDT Address" = "USDT Address";
+"USDT Balance" = "USDT Balance";
+"Wallet Name" = "Wallet Name";
+"Save Linked Wallet" = "Save Linked Wallet";
+"Link USDT Wallet" = "Link USDT Wallet";
+"Cancel" = "Cancel";
+"EVM Wallet Address" = "EVM Wallet Address";
+"Private Key" = "Private Key";
+"New Native USDT Wallet" = "New Native USDT Wallet";
+"Generate Keys" = "Generate Keys";
+"Live Sync" = "Live Sync";
+"Search by payment network..." = "Search by payment network...";
+"Linked USDT Wallets Available:" = "Linked USDT Wallets Available:";
+"Pay via %@" = "Pay via %@";
+"Withdraw from %@" = "Withdraw from %@";
+"Transfer Sent" = "Transfer Sent";
+"Your USDT transfer has been signed and broadcast.\nTx: %@" = "Your USDT transfer has been signed and broadcast.\nTx: %@";
+"Tron addresses must start with 'T' and be 34 characters." = "Tron addresses must start with 'T' and be 34 characters.";
+"EVM addresses must start with '0x' and be 42 characters." = "EVM addresses must start with '0x' and be 42 characters.";
+"Wallet Created Successfully!" = "Wallet Created Successfully!";
+"Write down your private key and keep it safe. If you lose it, you will lose access to your funds forever." = "Write down your private key and keep it safe. If you lose it, you will lose access to your funds forever.";
+"Note: The generated wallet uses standard SECP256k1 encryption. It resides entirely on-device and is stored inside the secure iOS Keychain." = "Note: The generated wallet uses standard SECP256k1 encryption. It resides entirely on-device and is stored inside the secure iOS Keychain.";
+"Manage, generate, and link your USDT wallets for P2P trading." = "Manage, generate, and link your USDT wallets for P2P trading.";
+"Open USDT Wallet Manager" = "Open USDT Wallet Manager";
+"Binance" = "Binance";
+"OKX" = "OKX";
+"Bybit" = "Bybit";
+"Coinbase" = "Coinbase";
+"MetaMask" = "MetaMask";
+"Trust Wallet" = "Trust Wallet";
+"Native Wallet" = "Native Wallet";
+"Withdraw from Binance" = "Withdraw from Binance";
+"Withdraw from OKX" = "Withdraw from OKX";
+"Withdraw from Bybit" = "Withdraw from Bybit";
+"Withdraw from Coinbase" = "Withdraw from Coinbase";
+
+

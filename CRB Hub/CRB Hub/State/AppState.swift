@@ -62,6 +62,13 @@ final class AppState {
         }
     }
     
+    // MARK: - Linked USDT Wallets
+    var linkedUSDTWallets: [USDTWallet] = [] {
+        didSet {
+            saveUSDTWallets()
+        }
+    }
+    
     init() {
         loadState()
         
@@ -98,6 +105,12 @@ final class AppState {
         let savedPrice = UserDefaults.standard.double(forKey: "cached_crb_price_usdt")
         if savedPrice > 0 {
             cachedCRBPriceUSDT = savedPrice
+        }
+        
+        // Load linked USDT wallets
+        if let usdtData = UserDefaults.standard.data(forKey: "linked_usdt_wallets"),
+           let loaded = try? JSONDecoder().decode([USDTWallet].self, from: usdtData) {
+            linkedUSDTWallets = loaded
         }
     }
     
@@ -142,6 +155,34 @@ final class AppState {
     func clearP2PSession() {
         p2pToken = nil
         p2pAddress = nil
+    }
+    
+    // MARK: - USDT Wallet Management
+    
+    func addUSDTWallet(_ wallet: USDTWallet) {
+        linkedUSDTWallets.append(wallet)
+    }
+    
+    func deleteUSDTWallet(id: UUID) {
+        linkedUSDTWallets.removeAll { $0.id == id }
+    }
+    
+    func refreshUSDTBalances() async {
+        for index in 0..<linkedUSDTWallets.count {
+            let wallet = linkedUSDTWallets[index]
+            do {
+                let bal = try await USDTBalanceService.fetchBalance(for: wallet.address, network: wallet.network)
+                linkedUSDTWallets[index].balance = bal
+            } catch {
+                print("Failed to fetch balance for \(wallet.name): \(error)")
+            }
+        }
+    }
+    
+    private func saveUSDTWallets() {
+        if let data = try? JSONEncoder().encode(linkedUSDTWallets) {
+            UserDefaults.standard.set(data, forKey: "linked_usdt_wallets")
+        }
     }
     
     // MARK: - Background Refresh
