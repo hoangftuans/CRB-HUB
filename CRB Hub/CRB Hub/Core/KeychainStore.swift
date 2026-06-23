@@ -97,56 +97,13 @@ final class KeychainStore {
         }
     }
     
-    /// Load private key from Keychain with biometric authentication enforced at the Keychain level.
-    /// There is NO unprotected path to read a private key — Face ID is enforced by SecAccessControl.
+    /// Load private key from Keychain with biometric authentication.
+    /// Approach: Check attributes first without retrieving data (non-prompting).
+    /// If the key has SecAccessControl, let Keychain handle Face ID (1 prompt).
+    /// If legacy, evaluate LAContext manually (1 prompt) and fetch data.
     func loadPrivateKeySecure(for walletId: UUID, reason: String = "Authenticate to access your wallet") async throws -> String {
-        // Try migration from legacy (unprotected) storage first
-        try await migrateKeyIfNeeded(for: walletId)
-        
-        // Create an LAContext for the biometric prompt
-        let context = LAContext()
-        context.localizedReason = reason
-        
+        // Step 1: Check attributes first (to identify legacy vs new protected keys without prompting Face ID)
         let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: walletId.uuidString,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseAuthenticationContext as String: context,
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        switch status {
-        case errSecSuccess:
-            guard let data = result as? Data,
-                  let privateKeyHex = String(data: data, encoding: .utf8) else {
-                throw KeychainError.invalidData
-            }
-            return privateKeyHex
-            
-        case errSecUserCanceled, errSecAuthFailed:
-            throw KeychainError.biometricAuthFailed
-            
-        case errSecItemNotFound:
-            throw KeychainError.loadFailed(status)
-            
-        default:
-            throw KeychainError.loadFailed(status)
-        }
-    }
-    
-    /// Migrate a legacy key (stored without biometric protection) to the new biometric-protected format.
-    /// This runs once per key — old entry is read, re-saved with SecAccessControl, and the old entry is deleted.
-    ///
-    /// Two-phase approach to avoid triggering Face ID during the check:
-    /// 1. Query ATTRIBUTES ONLY (no data) — does NOT trigger biometrics
-    /// 2. If key has no access control (legacy), THEN read data and migrate
-    private func migrateKeyIfNeeded(for walletId: UUID) async throws {
-        // Phase 1: Check attributes only — no kSecReturnData to avoid triggering Face ID
-        let attrQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: walletId.uuidString,
@@ -154,49 +111,93 @@ final class KeychainStore {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         
-        var attrResult: AnyObject?
-        let attrStatus = SecItemCopyMatching(attrQuery as CFDictionary, &attrResult)
+        var attributesResult: AnyObject?
+        let attributesStatus = SecItemCopyMatching(query as CFDictionary, &attributesResult)
         
-        guard attrStatus == errSecSuccess,
-              let dict = attrResult as? [String: Any] else {
-            // No key found at all — nothing to migrate
-            return
+        guard attributesStatus == errSecSuccess else {
+            throw KeychainError.loadFailed(attributesStatus)
         }
         
-        // If item already has access control, it's already migrated — skip
-        if dict[kSecAttrAccessControl as String] != nil {
-            return
+        guard let attributes = attributesResult as? [String: Any] else {
+            throw KeychainError.invalidData
         }
         
-        // Phase 2: Key exists WITHOUT access control (legacy) — read the actual data
-        // This won't trigger Face ID because the key is unprotected
-        let dataQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: walletId.uuidString,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        // If kSecAttrAccessControl is present, it means the key is saved with biometric SecAccessControl protection.
+        let hasAccessControl = attributes[kSecAttrAccessControl as String] != nil
         
-        var dataResult: AnyObject?
-        let dataStatus = SecItemCopyMatching(dataQuery as CFDictionary, &dataResult)
+        let context = LAContext()
+        context.localizedReason = reason
         
-        guard dataStatus == errSecSuccess,
-              let data = dataResult as? Data,
-              let privateKeyHex = String(data: data, encoding: .utf8) else {
-            return
+        if hasAccessControl {
+            // Key is protected by SecAccessControl.
+            // We pass the context with custom prompt details, but do NOT manually call evaluatePolicy.
+            // SecItemCopyMatching will trigger Face ID exactly once, using this context.
+            let protectedQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: walletId.uuidString,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+                kSecUseAuthenticationContext as String: context,
+            ]
+            
+            var result: AnyObject?
+            let status = SecItemCopyMatching(protectedQuery as CFDictionary, &result)
+            
+            guard status == errSecSuccess else {
+                if status == errSecUserCanceled || status == errSecAuthFailed {
+                    throw KeychainError.biometricAuthFailed
+                }
+                throw KeychainError.loadFailed(status)
+            }
+            
+            guard let data = result as? Data,
+                  let privateKeyHex = String(data: data, encoding: .utf8) else {
+                throw KeychainError.invalidData
+            }
+            
+            return privateKeyHex
+        } else {
+            // Key is a legacy key (unprotected in Keychain).
+            // We MUST manually enforce biometrics using LAContext to protect it.
+            var authError: NSError?
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &authError) {
+                try await context.evaluatePolicy(
+                    .deviceOwnerAuthenticationWithBiometrics,
+                    localizedReason: reason
+                )
+            } else if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &authError) {
+                try await context.evaluatePolicy(
+                    .deviceOwnerAuthentication,
+                    localizedReason: reason
+                )
+            } else {
+                throw KeychainError.biometricsUnavailable
+            }
+            
+            // Authentication succeeded, now fetch the legacy data
+            let legacyQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: walletId.uuidString,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]
+            
+            var legacyResult: AnyObject?
+            let legacyStatus = SecItemCopyMatching(legacyQuery as CFDictionary, &legacyResult)
+            
+            guard legacyStatus == errSecSuccess else {
+                throw KeychainError.loadFailed(legacyStatus)
+            }
+            
+            guard let data = legacyResult as? Data,
+                  let privateKeyHex = String(data: data, encoding: .utf8) else {
+                throw KeychainError.invalidData
+            }
+            
+            return privateKeyHex
         }
-        
-        // Phase 3: Delete the old unprotected key and re-save with biometric protection
-        let deleteQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: walletId.uuidString,
-        ]
-        SecItemDelete(deleteQuery as CFDictionary)
-        
-        // Re-save with biometric protection
-        try savePrivateKey(privateKeyHex, for: walletId)
     }
     
     /// Delete private key from Keychain (raw, no auth required for deletion)

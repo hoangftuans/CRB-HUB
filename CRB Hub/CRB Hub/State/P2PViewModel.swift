@@ -58,6 +58,7 @@ final class P2PViewModel {
     // MARK: - Auth Actions
     
     func login(appState: AppState) async {
+        guard !isLoggingIn else { return }
         guard let wallet = appState.selectedWallet else {
             loginError = "No wallet selected"
             return
