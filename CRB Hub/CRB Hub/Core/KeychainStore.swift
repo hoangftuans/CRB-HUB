@@ -140,37 +140,57 @@ final class KeychainStore {
     
     /// Migrate a legacy key (stored without biometric protection) to the new biometric-protected format.
     /// This runs once per key — old entry is read, re-saved with SecAccessControl, and the old entry is deleted.
+    ///
+    /// Two-phase approach to avoid triggering Face ID during the check:
+    /// 1. Query ATTRIBUTES ONLY (no data) — does NOT trigger biometrics
+    /// 2. If key has no access control (legacy), THEN read data and migrate
     private func migrateKeyIfNeeded(for walletId: UUID) async throws {
-        // Check if a legacy key exists (no access control)
-        let legacyQuery: [String: Any] = [
+        // Phase 1: Check attributes only — no kSecReturnData to avoid triggering Face ID
+        let attrQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: legacyService,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: walletId.uuidString,
-            kSecReturnData as String: true,
             kSecReturnAttributes as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         
-        var result: AnyObject?
-        let status = SecItemCopyMatching(legacyQuery as CFDictionary, &result)
+        var attrResult: AnyObject?
+        let attrStatus = SecItemCopyMatching(attrQuery as CFDictionary, &attrResult)
         
-        guard status == errSecSuccess,
-              let dict = result as? [String: Any],
-              let data = dict[kSecValueData as String] as? Data,
-              let privateKeyHex = String(data: data, encoding: .utf8) else {
-            // No legacy key found, or it's already migrated — nothing to do
+        guard attrStatus == errSecSuccess,
+              let dict = attrResult as? [String: Any] else {
+            // No key found at all — nothing to migrate
             return
         }
         
-        // Check if this item has access control. If it does, it's already migrated.
+        // If item already has access control, it's already migrated — skip
         if dict[kSecAttrAccessControl as String] != nil {
             return
         }
         
-        // Delete the old unprotected key
+        // Phase 2: Key exists WITHOUT access control (legacy) — read the actual data
+        // This won't trigger Face ID because the key is unprotected
+        let dataQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: walletId.uuidString,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        
+        var dataResult: AnyObject?
+        let dataStatus = SecItemCopyMatching(dataQuery as CFDictionary, &dataResult)
+        
+        guard dataStatus == errSecSuccess,
+              let data = dataResult as? Data,
+              let privateKeyHex = String(data: data, encoding: .utf8) else {
+            return
+        }
+        
+        // Phase 3: Delete the old unprotected key and re-save with biometric protection
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: legacyService,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: walletId.uuidString,
         ]
         SecItemDelete(deleteQuery as CFDictionary)
