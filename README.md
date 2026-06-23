@@ -134,7 +134,7 @@ Dự án được sở hữu và phát triển bởi **Hoang Tuan Nguyen**. Mọ
 ### 🚀 Hướng Dẫn Cài Đặt & Chạy Dự Án
 1. Clone mã nguồn:
    ```bash
-   git clone https://github.com/[username]/CRBHub.git
+   git clone https://github.com/hoangftuans/CRB-HUB
    cd CRBHub
    ```
 2. Mở dự án trong Xcode:
