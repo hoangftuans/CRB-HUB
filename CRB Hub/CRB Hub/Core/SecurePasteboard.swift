@@ -15,7 +15,7 @@ enum SecurePasteboard {
     ///   - string: The sensitive string to copy (e.g., a private key)
     ///   - expirySeconds: Time in seconds before the clipboard auto-clears (default: 60)
     @MainActor
-    static func copyWithExpiry(_ string: String, expirySeconds: TimeInterval = defaultExpiry) {
+    static func copyWithExpiry(_ string: String, expirySeconds: TimeInterval = 60) {
         let expirationDate = Date().addingTimeInterval(expirySeconds)
         
         UIPasteboard.general.setItems(

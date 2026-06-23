@@ -271,7 +271,7 @@ struct AddUSDTWalletSheet: View {
                                 .foregroundColor(CRBTheme.Colors.error)
                         }
                         
-                        GradientButton(title: "Save Linked Wallet".localized, icon: "link.circle.fill", disabled: !isValid) {
+                        GradientButton(title: "Save Linked Wallet".localized, icon: "link.circle.fill", isDisabled: !isValid) {
                             saveWallet()
                         }
                     }
@@ -339,137 +339,10 @@ struct GenerateNativeUSDTSheet: View {
                 
                 ScrollView {
                     VStack(spacing: CRBTheme.Spacing.xl) {
-                        if let wallet = generatedWallet {
-                            // Success View
-                            VStack(spacing: CRBTheme.Spacing.lg) {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(CRBTheme.Colors.buyGreen)
-                                
-                                Text("Wallet Created Successfully!".localized)
-                                    .font(CRBTheme.Typography.title())
-                                    .foregroundColor(CRBTheme.Colors.ink)
-                                
-                                // Warning box
-                                HStack(spacing: 8) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(CRBTheme.Colors.warning)
-                                    Text("Write down your private key and keep it safe. If you lose it, you will lose access to your funds forever.".localized)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(CRBTheme.Colors.warning.opacity(0.95))
-                                }
-                                .padding(CRBTheme.Spacing.md)
-                                .background(CRBTheme.Colors.warning.opacity(0.08))
-                                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
-                                
-                                // Address box
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("EVM Wallet Address".localized)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(CRBTheme.Colors.muted)
-                                    
-                                    HStack {
-                                        Text(wallet.address)
-                                            .font(.system(size: 13, weight: .bold, design: .monospaced))
-                                            .foregroundColor(CRBTheme.Colors.ink)
-                                            .lineLimit(1)
-                                            .truncationMode(.middle)
-                                        Spacer()
-                                        Button {
-                                            UIPasteboard.general.string = wallet.address
-                                        } label: {
-                                            Image(systemName: "doc.on.doc")
-                                                .foregroundColor(CRBTheme.Colors.cyan)
-                                        }
-                                    }
-                                    .padding(CRBTheme.Spacing.sm)
-                                    .background(CRBTheme.Colors.backgroundSecondary)
-                                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
-                                }
-                                
-                                // Private key box
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Private Key".localized)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(CRBTheme.Colors.muted)
-                                    
-                                    HStack {
-                                        Text(wallet.privateKey)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(CRBTheme.Colors.error)
-                                            .lineLimit(1)
-                                            .truncationMode(.middle)
-                                        Spacer()
-                                        Button {
-                                            SecurePasteboard.copyWithExpiry(wallet.privateKey)
-                                            withAnimation { copiedKey = true }
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                                copiedKey = false
-                                            }
-                                        } label: {
-                                            Image(systemName: copiedKey ? "checkmark" : "doc.on.doc")
-                                                .foregroundColor(copiedKey ? CRBTheme.Colors.success : CRBTheme.Colors.error)
-                                        }
-                                    }
-                                    .padding(CRBTheme.Spacing.sm)
-                                    .background(CRBTheme.Colors.error.opacity(0.05))
-                                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
-                                            .stroke(CRBTheme.Colors.error.opacity(0.2), lineWidth: 1)
-                                    )
-                                }
-                                
-                                GradientButton(title: "Done".localized, icon: "checkmark.circle.fill") {
-                                    dismiss()
-                                }
-                                .padding(.top, CRBTheme.Spacing.md)
-                            }
-                            .padding(CRBTheme.Spacing.xl)
-                            
+                        if generatedWallet != nil {
+                            successContent
                         } else {
-                            // Input / Gen form
-                            VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
-                                Text("Wallet Name".localized)
-                                    .font(CRBTheme.Typography.caption())
-                                    .foregroundColor(CRBTheme.Colors.muted)
-                                
-                                TextField("e.g. My Native USDT Wallet", text: $name)
-                                    .textFieldStyle(.plain)
-                                    .foregroundColor(CRBTheme.Colors.ink)
-                                    .padding(CRBTheme.Spacing.md)
-                                    .background(CRBTheme.Colors.backgroundSecondary)
-                                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
-                            }
-                            
-                            VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
-                                Text("Network".localized)
-                                    .font(CRBTheme.Typography.caption())
-                                    .foregroundColor(CRBTheme.Colors.muted)
-                                
-                                Picker("Network", selection: $network) {
-                                    // TRC20 not supported for native gen since TRON requires a different key format than EVM
-                                    ForEach(USDTNetwork.allCases.filter { $0 != .trc20 }) { net in
-                                        Text(net.displayName).tag(net)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                                .tint(CRBTheme.Colors.cyan)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(CRBTheme.Spacing.md)
-                                .background(CRBTheme.Colors.backgroundSecondary)
-                                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
-                            }
-                            
-                            Text("Note: The generated wallet uses standard SECP256k1 encryption. It resides entirely on-device and is stored inside the secure iOS Keychain.".localized)
-                                .font(.system(size: 11))
-                                .foregroundColor(CRBTheme.Colors.muted)
-                                .padding(.vertical, 4)
-                            
-                            GradientButton(title: "Generate Keys".localized, icon: "iphone.gen3", disabled: name.trimmingCharacters(in: .whitespaces).isEmpty) {
-                                generateWallet()
-                            }
+                            formContent
                         }
                     }
                     .padding(CRBTheme.Spacing.xl)
@@ -486,6 +359,147 @@ struct GenerateNativeUSDTSheet: View {
                         .foregroundColor(CRBTheme.Colors.muted)
                     }
                 }
+            }
+        }
+    }
+    
+    // MARK: - Success Content (extracted to help type-checker)
+    
+    @ViewBuilder
+    private var successContent: some View {
+        if let wallet = generatedWallet {
+            VStack(spacing: CRBTheme.Spacing.lg) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(CRBTheme.Colors.buyGreen)
+                
+                Text("Wallet Created Successfully!".localized)
+                    .font(CRBTheme.Typography.title())
+                    .foregroundColor(CRBTheme.Colors.ink)
+                
+                // Warning box
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(CRBTheme.Colors.warning)
+                    Text("Write down your private key and keep it safe. If you lose it, you will lose access to your funds forever.".localized)
+                        .font(.system(size: 11))
+                        .foregroundColor(CRBTheme.Colors.warning.opacity(0.95))
+                }
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.warning.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+                
+                // Address box
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("EVM Wallet Address".localized)
+                        .font(.system(size: 11))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                    
+                    HStack {
+                        Text(wallet.address)
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundColor(CRBTheme.Colors.ink)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button {
+                            UIPasteboard.general.string = wallet.address
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .foregroundColor(CRBTheme.Colors.cyan)
+                        }
+                    }
+                    .padding(CRBTheme.Spacing.sm)
+                    .background(CRBTheme.Colors.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                }
+                
+                // Private key box
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Private Key".localized)
+                        .font(.system(size: 11))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                    
+                    HStack {
+                        Text(wallet.privateKey)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(CRBTheme.Colors.error)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button {
+                            SecurePasteboard.copyWithExpiry(wallet.privateKey)
+                            withAnimation { copiedKey = true }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                copiedKey = false
+                            }
+                        } label: {
+                            Image(systemName: copiedKey ? "checkmark" : "doc.on.doc")
+                                .foregroundColor(copiedKey ? CRBTheme.Colors.success : CRBTheme.Colors.error)
+                        }
+                    }
+                    .padding(CRBTheme.Spacing.sm)
+                    .background(CRBTheme.Colors.error.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
+                            .stroke(CRBTheme.Colors.error.opacity(0.2), lineWidth: 1)
+                    )
+                }
+                
+                GradientButton(title: "Done".localized, icon: "checkmark.circle.fill") {
+                    dismiss()
+                }
+                .padding(.top, CRBTheme.Spacing.md)
+            }
+            .padding(CRBTheme.Spacing.xl)
+        }
+    }
+    
+    // MARK: - Form Content (extracted to help type-checker)
+    
+    private var formContent: some View {
+        VStack(spacing: CRBTheme.Spacing.lg) {
+            VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+                Text("Wallet Name".localized)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.muted)
+                
+                TextField("e.g. My Native USDT Wallet", text: $name)
+                    .textFieldStyle(.plain)
+                    .foregroundColor(CRBTheme.Colors.ink)
+                    .padding(CRBTheme.Spacing.md)
+                    .background(CRBTheme.Colors.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+            }
+            
+            VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+                Text("Network".localized)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.muted)
+                
+                Picker("Network", selection: $network) {
+                    // TRC20 not supported for native gen since TRON requires a different key format than EVM
+                    ForEach(USDTNetwork.allCases.filter { $0 != .trc20 }) { net in
+                        Text(net.displayName).tag(net)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(CRBTheme.Colors.cyan)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+            }
+            
+            Text("Note: The generated wallet uses standard SECP256k1 encryption. It resides entirely on-device and is stored inside the secure iOS Keychain.".localized)
+                .font(.system(size: 11))
+                .foregroundColor(CRBTheme.Colors.muted)
+                .padding(.vertical, 4)
+            
+            GradientButton(title: "Generate Keys".localized, icon: "iphone.gen3", isDisabled: name.trimmingCharacters(in: .whitespaces).isEmpty) {
+                generateWallet()
             }
         }
     }
