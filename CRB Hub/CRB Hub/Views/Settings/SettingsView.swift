@@ -9,6 +9,10 @@ struct SettingsView: View {
     @State private var deleteWalletId: UUID?
     @State private var nodeURLInput = ""
     @State private var savedNodeURL = false
+    @State private var copiedDonationAddress = false
+    
+    // Developer Donation Wallet Address (Change this to your real CRB address)
+    private let donationAddress = "crb1555555555555555555555555555555555555555"
     
     var body: some View {
         NavigationStack {
@@ -28,6 +32,9 @@ struct SettingsView: View {
                         
                         // Currency & Region
                         currencySection
+                        
+                        // Support Developer
+                        donateSection
                         
                         // About
                         aboutSection
@@ -316,6 +323,50 @@ struct SettingsView: View {
                         .foregroundColor(CRBTheme.Colors.cyan)
                 }
             }
+        }
+        .glassCard()
+    }
+    
+    // MARK: - Support Developer
+    
+    private var donateSection: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            SectionHeader(title: "Support Developer".localized, icon: "heart.fill")
+            
+            Text("If you find CRB Hub helpful, please consider supporting the developer by donating some CRB.".localized)
+                .font(.system(size: 13))
+                .foregroundColor(CRBTheme.Colors.muted)
+                .multilineTextAlignment(.leading)
+            
+            HStack(spacing: CRBTheme.Spacing.md) {
+                Text(AddressValidator.truncatedAddress(donationAddress))
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .foregroundColor(CRBTheme.Colors.cyan)
+                
+                Spacer()
+                
+                Button {
+                    UIPasteboard.general.string = donationAddress
+                    withAnimation { copiedDonationAddress = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { copiedDonationAddress = false }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: copiedDonationAddress ? "checkmark" : "doc.on.doc")
+                        Text(copiedDonationAddress ? "Copied!".localized : "Copy".localized)
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(copiedDonationAddress ? CRBTheme.Colors.success : CRBTheme.Colors.cyan)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(copiedDonationAddress ? CRBTheme.Colors.success.opacity(0.1) : CRBTheme.Colors.cyan.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+            }
+            .padding(CRBTheme.Spacing.sm)
+            .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
         }
         .glassCard()
     }

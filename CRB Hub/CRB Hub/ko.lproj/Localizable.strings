@@ -1,4 +1,4 @@
-/* KO Localizable.strings (Updated with Onboarding) */
+/* KO Localizable.strings (Updated with Donation) */
 
 "%1$d/64 characters" = "%1$d/64자";
 "24h Change" = "24시간 변동";
@@ -88,6 +88,7 @@
 "I have backed up my private key" = "개인 키를 백업했습니다";
 "I understand that losing this key means losing my CRB forever" = "이 키를 분실하면 CRB를 영구적으로 잃게 된다는 점을 이해합니다";
 "Idle" = "오프라인";
+"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "CRB Hub가 도움이 되었다면, 개발자에게 소액의 CRB를 후원해 주세요.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "이 키를 분실하면 지갑에 대한 접근 권한을 영구적으로 잃게 됩니다. 누구도 이를 복구할 수 없습니다.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "이 키를 분실하면 자금을 영구적으로 잃게 됩니다. 오프라인에 안전하게 보관하십시오.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "개인 키를 분실하면 CRB는 영구히 소실됩니다. 그 누구도 복구할 수 없습니다.";
@@ -192,6 +193,7 @@
 "Spendable" = "사용 가능 잔액";
 "Start Using CRB Hub" = "CRB Hub 시작하기";
 "Success" = "성공";
+"Support Developer" = "개발자 후원";
 "This is the ONLY way to recover your wallet" = "이것이 지갑을 복구할 수 있는 유일한 방법입니다";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "이 지갑은 장치에서 영구히 삭제됩니다. 반드시 개인 키를 백업하셨는지 확인하십시오.";
 "Ticker" = "시세 정보";

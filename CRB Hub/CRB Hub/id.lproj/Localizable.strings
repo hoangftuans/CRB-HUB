@@ -1,4 +1,4 @@
-/* ID Localizable.strings (Updated with Onboarding) */
+/* ID Localizable.strings (Updated with Donation) */
 
 "%1$d/64 characters" = "%1$d/64 karakter";
 "24h Change" = "Perubahan 24j";
@@ -88,6 +88,7 @@
 "I have backed up my private key" = "Saya telah mencadangkan kunci pribadi saya";
 "I understand that losing this key means losing my CRB forever" = "Saya mengerti bahwa kehilangan kunci ini berarti kehilangan CRB saya selamanya";
 "Idle" = "Offline";
+"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "Jika Anda merasa CRB Hub bermanfaat, pertimbangkan untuk mendukung pengembang dengan cách mendonasikan sedikit CRB.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "Jika Anda kehilangan kunci ini, Anda akan kehilangan akses ke dompet Anda secara permanen. Tidak ada yang bisa memulihkannya.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "Jika Anda kehilangan kunci ini, Anda akan kehilangan dana Anda selamanya. Simpan dengan aman secara offline.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "Jika Anda kehilangan kunci pribadi, CRB Anda akan hilang selamanya. Tidak ada yang bisa memulihkannya — bahkan kami.";
@@ -192,6 +193,7 @@
 "Spendable" = "Dapat Dibelanjakan";
 "Start Using CRB Hub" = "Mulai Gunakan CRB Hub";
 "Success" = "Berhasil";
+"Support Developer" = "Dukung Pengembang";
 "This is the ONLY way to recover your wallet" = "Ini adalah SATU-SATUNYA cara untuk memulihkan dompet Anda";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "Tindakan ini akan menghapus dompet secara permanen dari perangkat ini. Pastikan Anda telah mencadangkan kunci pribadi Anda.";
 "Ticker" = "Harga Pasar";

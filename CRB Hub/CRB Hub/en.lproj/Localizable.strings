@@ -1,4 +1,4 @@
-/* EN Localizable.strings (Updated with Onboarding) */
+/* EN Localizable.strings (Updated with Donation) */
 
 "%1$d/64 characters" = "%1$d/64 characters";
 "24h Change" = "24h Change";
@@ -88,6 +88,7 @@
 "I have backed up my private key" = "I have backed up my private key";
 "I understand that losing this key means losing my CRB forever" = "I understand that losing this key means losing my CRB forever";
 "Idle" = "Idle";
+"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "If you find CRB Hub helpful, please consider supporting the developer by donating some CRB.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "If you lose this key, you lose access to your wallet permanently. No one can recover it.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "If you lose this key, you lose your funds forever. Store it securely offline.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "If you lose your private key, your CRB is gone forever. No one can recover it — not even us.";
@@ -192,6 +193,7 @@
 "Spendable" = "Spendable";
 "Start Using CRB Hub" = "Start Using CRB Hub";
 "Success" = "Success";
+"Support Developer" = "Support Developer";
 "This is the ONLY way to recover your wallet" = "This is the ONLY way to recover your wallet";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "This will permanently delete this wallet from this device. Make sure you have backed up your private key.";
 "Ticker" = "Ticker";

@@ -1,4 +1,4 @@
-/* TH Localizable.strings (Updated with Onboarding) */
+/* TH Localizable.strings (Updated with Donation) */
 
 "%1$d/64 characters" = "%1$d/64 ตัวอักษร";
 "24h Change" = "เปลี่ยน 24 ชม.";
@@ -88,6 +88,7 @@
 "I have backed up my private key" = "ฉันได้สำรองรหัสลับของฉันแล้ว";
 "I understand that losing this key means losing my CRB forever" = "ฉันเข้าใจว่าการทำรหัสลับนี้หายหมายถึงการสูญเสีย CRB ของฉันไปตลอดกาล";
 "Idle" = "หยุดทำงาน";
+"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "หากคุณพบว่า CRB Hub มีประโยชน์ โปรดสนับสนุนผู้พัฒนาโดยการบริจาค CRB เล็กน้อย";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "หากคุณทำรหัสลับนี้หาย คุณจะสูญเสียสิทธิ์ในการเข้าถึงกระเป๋าเงินของคุณอย่างถาวร ไม่มีใครสามารถกู้คืนได้";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "หากคุณทำรหัสลับนี้หาย คุณจะสูญเสียเงินของคุณไปตลอดกาล โปรดเก็บรักษามันไว้ออฟไลน์อย่างปลอดภัย";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "หากคุณทำรหัสลับหาย CRB ของคุณจะหายไปตลอดกาล ไม่มีใครสามารถกู้คืนได้ — แม้แต่เรา";
@@ -192,6 +193,7 @@
 "Spendable" = "ใช้จ่ายได้";
 "Start Using CRB Hub" = "เริ่มต้นใช้งาน CRB Hub";
 "Success" = "สำเร็จ";
+"Support Developer" = "สนับสนุนผู้พัฒนา";
 "This is the ONLY way to recover your wallet" = "นี่เป็นวิธีเดียวในการกู้คืนกระเป๋าเงินของคุณ";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "การดำเนินการนี้จะลบกระเป๋าเงินออกจากอุปกรณ์นี้อย่างถาวร ตรวจสอบให้แน่ใจว่าคุณได้สำรองรหัสลับของคุณแล้ว";
 "Ticker" = "ราคาตลาด";

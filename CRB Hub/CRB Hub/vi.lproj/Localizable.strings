@@ -1,4 +1,4 @@
-/* VI Localizable.strings (Updated with Onboarding) */
+/* VI Localizable.strings (Updated with Donation) */
 
 "%1$d/64 characters" = "%1$d/64 ký tự";
 "24h Change" = "Thay đổi 24h";
@@ -88,6 +88,7 @@
 "I have backed up my private key" = "Tôi đã sao lưu khóa bí mật";
 "I understand that losing this key means losing my CRB forever" = "Tôi hiểu rằng mất khóa này có nghĩa là mất CRB vĩnh viễn";
 "Idle" = "Ngoại tuyến";
+"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "Nếu bạn thấy CRB Hub hữu ích, hãy ủng hộ nhà phát triển bằng cách gửi tặng một ít CRB.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "Nếu bạn mất khóa này, bạn sẽ mất quyền truy cập vào ví của mình vĩnh viễn. Không ai có thể khôi phục được nó.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "Nếu mất khóa này, bạn sẽ mất tiền vĩnh viễn. Hãy lưu giữ an toàn ngoại tuyến.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "Nếu bạn mất khóa bí mật, số CRB của bạn sẽ mất vĩnh viễn. Không ai có thể khôi phục lại nó — kể cả chúng tôi.";
@@ -192,6 +193,7 @@
 "Spendable" = "Khả dụng";
 "Start Using CRB Hub" = "Bắt đầu sử dụng CRB Hub";
 "Success" = "Thành công";
+"Support Developer" = "Ủng hộ nhà phát triển";
 "This is the ONLY way to recover your wallet" = "Đây là cách DUY NHẤT để khôi phục ví của bạn";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "Hành động này sẽ xóa vĩnh viễn ví này khỏi thiết bị. Hãy đảm bảo bạn đã lưu lại khóa bí mật của mình.";
 "Ticker" = "Bảng giá";
