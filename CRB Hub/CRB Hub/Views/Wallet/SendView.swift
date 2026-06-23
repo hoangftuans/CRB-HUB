@@ -13,8 +13,11 @@ struct SendView: View {
     @State private var error: String?
     @State private var sendResult: BroadcastResult?
     
-    init(prefilledAddress: String = "") {
+    init(prefilledAddress: String = "", prefilledAmount: String? = nil) {
         _recipientAddress = State(initialValue: prefilledAddress)
+        if let amount = prefilledAmount {
+            _amountString = State(initialValue: amount)
+        }
     }
     
     var isValidAddress: Bool {

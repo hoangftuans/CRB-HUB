@@ -24,6 +24,9 @@ struct P2PTradeView: View {
                         // Trade details
                         tradeDetails(trade)
                         
+                        // Escrow deposit
+                        escrowSection(trade)
+                        
                         // Actions
                         tradeActions(trade)
                         
@@ -317,6 +320,157 @@ struct P2PTradeView: View {
             }
         }
         .glassCard()
+    }
+    
+    @ViewBuilder
+    private func escrowSection(_ trade: P2PTrade) -> some View {
+        if trade.State == "AWAITING_LOCK" || trade.State == "LOCKED" {
+            let isMaker = trade.MakerAddr == appState.selectedWallet?.address
+            let isTaker = trade.TakerAddr == appState.selectedWallet?.address
+            let isSeller = (trade.Side == "sell_crb" && isMaker) || (trade.Side == "buy_crb" && isTaker)
+            
+            let myLocked = isSeller ? (trade.CRBLocked ?? false) : (trade.USDTFunded ?? false)
+            let otherLocked = isSeller ? (trade.USDTFunded ?? false) : (trade.CRBLocked ?? false)
+            let escrowAddr = (isSeller ? trade.EscrowCRB : trade.EscrowUSDT) ?? ""
+            let amountStr = isSeller ? "\(String(format: "%.4f", trade.AmountCRB ?? 0))" : "\(String(format: "%.6f", trade.AmountUSDT ?? 0))"
+            let assetName = isSeller ? "CRB" : "USDT"
+            
+            VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+                SectionHeader(title: "Escrow Deposit".localized, icon: "lock.fill")
+                
+                // My Leg Status Card
+                VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+                    HStack {
+                        PillBadge(text: "Your Deposit".localized, color: myLocked ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.warning)
+                        Spacer()
+                        if myLocked {
+                            Text("Locked ✓".localized)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(CRBTheme.Colors.buyGreen)
+                        } else if isSeller && (trade.CRBSeen ?? false) {
+                            Text(String(format: "Confirming (%d/10)".localized, trade.CRBConfs ?? 0))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(CRBTheme.Colors.warning)
+                        } else if !isSeller && (trade.USDTSeen ?? false) {
+                            Text("USDT Detected".localized)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(CRBTheme.Colors.warning)
+                        } else {
+                            Text("Awaiting Deposit".localized)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(CRBTheme.Colors.muted)
+                        }
+                    }
+                    
+                    if !myLocked {
+                        Text(isSeller ? 
+                             String(format: "Deposit %@ CRB to the escrow address below:".localized, amountStr) :
+                             String(format: "Deposit %@ USDT via %@ network to the escrow address below:".localized, amountStr, trade.Rail?.uppercased() ?? ""))
+                            .font(.system(size: 13))
+                            .foregroundColor(CRBTheme.Colors.muted)
+                            .lineSpacing(4)
+                        
+                        if !escrowAddr.isEmpty {
+                            // Escrow address copy row
+                            HStack {
+                                Text(escrowAddr)
+                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                    .foregroundColor(CRBTheme.Colors.ink)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                
+                                Spacer()
+                                
+                                Button {
+                                    UIPasteboard.general.string = escrowAddr
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(CRBTheme.Colors.cyan)
+                                }
+                            }
+                            .padding(CRBTheme.Spacing.md)
+                            .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                            
+                            // Safe deposit warning box
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(CRBTheme.Colors.warning)
+                                Text(String(format: "Only send %@ on the correct network. Sending to wrong address or network will result in permanent loss.".localized, assetName))
+                                    .font(.system(size: 11))
+                                    .foregroundColor(CRBTheme.Colors.warning.opacity(0.85))
+                            }
+                            .padding(CRBTheme.Spacing.sm)
+                            .background(CRBTheme.Colors.warning.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.xs))
+                            
+                            if isSeller {
+                                // Direct Pay Escrow button opening SendView prefilled
+                                NavigationLink {
+                                    SendView(prefilledAddress: escrowAddr, prefilledAmount: amountStr)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "paperplane.fill")
+                                        Text("Pay Escrow".localized)
+                                            .fontWeight(.bold)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(CRBTheme.Spacing.md)
+                                    .background(CRBTheme.Gradients.primary)
+                                    .foregroundColor(Color(hex: 0x06121F))
+                                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+                                }
+                                .padding(.top, 4)
+                            }
+                        }
+                    } else {
+                        Text("Your deposit is locked in escrow ✓".localized)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(CRBTheme.Colors.buyGreen)
+                    }
+                }
+                .padding(CRBTheme.Spacing.lg)
+                .background(CRBTheme.Colors.backgroundSecondary.opacity(0.2))
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+                .overlay(
+                    RoundedRectangle(cornerRadius: CRBTheme.Radius.md)
+                        .stroke(myLocked ? CRBTheme.Colors.buyGreen.opacity(0.2) : CRBTheme.Colors.cardBorder, lineWidth: 1)
+                )
+                
+                // Counterparty Leg Status Card
+                HStack {
+                    PillBadge(text: "Counterparty Deposit".localized, color: otherLocked ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.muted)
+                    Spacer()
+                    if otherLocked {
+                        Text("Locked ✓".localized)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(CRBTheme.Colors.buyGreen)
+                    } else if isSeller && (trade.USDTSeen ?? false) {
+                        Text("USDT Detected".localized)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(CRBTheme.Colors.warning)
+                    } else if !isSeller && (trade.CRBSeen ?? false) {
+                        Text(String(format: "Confirming (%d/10)".localized, trade.CRBConfs ?? 0))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(CRBTheme.Colors.warning)
+                    } else {
+                        Text("Awaiting Deposit".localized)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(CRBTheme.Colors.muted)
+                    }
+                }
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.backgroundSecondary.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+                .overlay(
+                    RoundedRectangle(cornerRadius: CRBTheme.Radius.md)
+                        .stroke(CRBTheme.Colors.cardBorder, lineWidth: 1)
+                )
+            }
+            .glassCard()
+        }
     }
     
     private func stateColor(_ state: String) -> Color {

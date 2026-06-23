@@ -228,3 +228,18 @@
 "Your transaction history will appear here" = "Your transaction history will appear here";
 "Your wallet is ready. The private key is securely stored in your device's Keychain." = "Your wallet is ready. The private key is securely stored in your device's Keychain.";
 "kSecAttrAccessibleWhenUnlockedThisDeviceOnly" = "kSecAttrAccessibleWhenUnlockedThisDeviceOnly";
+
+/* P2P Escrow Deposit */
+"Escrow Deposit" = "Escrow Deposit";
+"Your Deposit" = "Your Deposit";
+"Locked ✓" = "Locked ✓";
+"Confirming (%d/10)" = "Confirming (%d/10)";
+"USDT Detected" = "USDT Detected";
+"Awaiting Deposit" = "Awaiting Deposit";
+"Deposit %@ CRB to the escrow address below:" = "Deposit %@ CRB to the escrow address below:";
+"Deposit %@ USDT via %@ network to the escrow address below:" = "Deposit %@ USDT via %@ network to the escrow address below:";
+"Only send %@ on the correct network. Sending to wrong address or network will result in permanent loss." = "Only send %@ on the correct network. Sending to wrong address or network will result in permanent loss.";
+"Pay Escrow" = "Pay Escrow";
+"Your deposit is locked in escrow ✓" = "Your deposit is locked in escrow ✓";
+"Counterparty Deposit" = "Counterparty Deposit";
+

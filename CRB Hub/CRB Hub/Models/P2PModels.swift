@@ -120,6 +120,21 @@ struct P2PTrade: Codable, Identifiable {
     let Created: Int?
     let Updated: Int?
     
+    // Escrow & details
+    let Maker: String?
+    let Taker: String?
+    let EscrowCRB: String?
+    let EscrowUSDT: String?
+    let CRBLocked: Bool?
+    let USDTFunded: Bool?
+    let CRBSeen: Bool?
+    let USDTSeen: Bool?
+    let CRBConfs: Int?
+    let MakerReady: Bool?
+    let TakerReady: Bool?
+    let ReadyDeadline: Int?
+    let LockDeadline: Int?
+    
     var id: String { self.ID ?? UUID().uuidString }
     
     var stateLabel: String {

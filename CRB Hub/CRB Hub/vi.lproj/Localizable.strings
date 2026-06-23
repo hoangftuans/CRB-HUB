@@ -228,3 +228,18 @@
 "Your transaction history will appear here" = "Lịch sử giao dịch của bạn sẽ hiển thị ở đây";
 "Your wallet is ready. The private key is securely stored in your device's Keychain." = "Ví của bạn đã sẵn sàng. Khóa bí mật được lưu trữ an toàn trong Keychain trên thiết bị.";
 "kSecAttrAccessibleWhenUnlockedThisDeviceOnly" = "kSecAttrAccessibleWhenUnlockedThisDeviceOnly";
+
+/* P2P Escrow Deposit */
+"Escrow Deposit" = "Ký quỹ tài sản";
+"Your Deposit" = "Khoản nạp của bạn";
+"Locked ✓" = "Đã khóa quỹ ✓";
+"Confirming (%d/10)" = "Đang xác nhận (%d/10)";
+"USDT Detected" = "Đã nhận USDT";
+"Awaiting Deposit" = "Đang chờ nạp tiền";
+"Deposit %@ CRB to the escrow address below:" = "Vui lòng chuyển %@ CRB tới địa chỉ ký quỹ dưới đây:";
+"Deposit %@ USDT via %@ network to the escrow address below:" = "Vui lòng chuyển %@ USDT qua mạng %@ tới địa chỉ ký quỹ dưới đây:";
+"Only send %@ on the correct network. Sending to wrong address or network will result in permanent loss." = "Chỉ gửi %@ qua đúng mạng lưới. Gửi sai địa chỉ hoặc sai mạng sẽ dẫn đến mất tiền vĩnh viễn.";
+"Pay Escrow" = "Nạp tiền ký quỹ";
+"Your deposit is locked in escrow ✓" = "Khoản nạp của bạn đã được khóa an toàn ✓";
+"Counterparty Deposit" = "Khoản nạp của đối tác";
+
