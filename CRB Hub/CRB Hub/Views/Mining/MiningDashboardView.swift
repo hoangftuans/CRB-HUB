@@ -50,6 +50,18 @@ struct MiningDashboardView: View {
             .onDisappear {
                 viewModel.stopAutoRefresh()
             }
+            .onChange(of: appState.selectedWallet?.id) { _, _ in
+                if let addr = appState.selectedWallet?.address {
+                    Task {
+                        await viewModel.loadAll(address: addr)
+                        viewModel.startAutoRefresh(address: addr)
+                    }
+                } else {
+                    viewModel.myMiner = nil
+                    viewModel.workers = []
+                    viewModel.stopAutoRefresh()
+                }
+            }
             .navigationDestination(isPresented: $showSetup) {
                 MiningSetupView()
             }
@@ -221,7 +233,7 @@ struct MiningDashboardView: View {
                     StatCard(icon: "person.2.fill", label: "Miners".localized, value: "\(pool.active_miners ?? 0)", color: CRBTheme.Colors.violet)
                     StatCard(icon: "percent", label: "Pool Fee".localized, value: String(format: "%.1f%%", Double(pool.fee_permil ?? 10) / 10.0), color: CRBTheme.Colors.info)
                     StatCard(icon: "arrow.down.to.line", label: "Min Payout".localized, value: CRBUnits.formatCRBCompact(pool.min_payout ?? 0), color: CRBTheme.Colors.buyGreen, subtitle: minPayoutFiat)
-                    StatCard(icon: "banknote", label: "Paid".localized, value: CRBUnits.formatCRBCompact(pool.total_paid ?? 0), color: CRBTheme.Colors.success, subtitle: totalPaidFiat)
+                    StatCard(icon: "banknote", label: "Total Paid".localized, value: CRBUnits.formatCRBCompact(pool.total_paid ?? 0), color: CRBTheme.Colors.success, subtitle: totalPaidFiat)
                 }
             }
             

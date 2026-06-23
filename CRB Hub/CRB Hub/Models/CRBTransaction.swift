@@ -18,6 +18,9 @@ struct CRBTransaction: Codable, Identifiable {
         if from == nil && to == address {
             return .mined
         } else if to == address {
+            if from == "crb1b1a90fe0fdd522368cc784973c768cf3ca46c9d6" {
+                return .mined
+            }
             return .received
         } else if from == address {
             return .sent

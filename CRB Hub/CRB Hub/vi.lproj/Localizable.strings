@@ -138,7 +138,8 @@
 "P2P Market" = "Thị trường P2P";
 "P2P Offers" = "Lệnh P2P của tôi";
 "P2P token held in memory only" = "Token P2P chỉ được giữ trong bộ nhớ tạm";
-"Paid" = "Đã thanh toán";
+"Paid" = "Đã nhận";
+"Total Paid" = "Tổng chi trả của Pool";
 "Paste" = "Dán";
 "Peers" = "Kết nối";
 "Percent Mined" = "Tỷ lệ khai thác";
