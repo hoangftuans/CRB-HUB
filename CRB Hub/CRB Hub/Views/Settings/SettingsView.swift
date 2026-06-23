@@ -11,7 +11,7 @@ struct SettingsView: View {
     @State private var savedNodeURL = false
     @State private var copiedDonationAddress = false
     
-    // Developer Donation Wallet Address (Change this to your real CRB address)
+    // Địa chỉ ví nhận donate
     private let donationAddress = "crb1bcf10b1d12f028f8a3583010c1be8f228360727b"
     
     var body: some View {
@@ -391,6 +391,16 @@ struct SettingsView: View {
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
             SectionHeader(title: "About".localized, icon: "info.circle")
+            
+            HStack {
+                Spacer()
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 48, height: 48)
+                Spacer()
+            }
+            .padding(.vertical, CRBTheme.Spacing.xs)
             
             HStack {
                 Text("App Version".localized)

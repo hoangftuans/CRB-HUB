@@ -39,9 +39,7 @@ enum WalletCore {
     
     // MARK: - Address Derivation
     
-    /// Derive CRB address from a public key
-    /// Format: "crb1" + SHA256(pubkey)[0..<20].hex (40 hex chars)
-    /// Note: This is our best guess — may need adjustment based on reference wallet
+    /// Derive CRB address from a public key: "crb1" + SHA256(pubkey)[0..<20]
     static func deriveAddress(from publicKeyBytes: Data) -> String {
         let hash = SHA256.hash(data: publicKeyBytes)
         let addressBytes = Data(hash.prefix(20))
@@ -68,11 +66,9 @@ enum WalletCore {
         return try signMessage(messageData, privateKeyHex: privateKeyHex)
     }
     
-    // MARK: - Transaction Signing (Phase 4 - Stub)
+    // MARK: - Transaction Signing
     
-    /// Build and sign a CRB transaction
-    /// NOTE: This requires knowledge of the canonical tx byte format from the reference wallet.
-    /// Currently returns nil — will be implemented when we have the exact spec.
+    /// Ký giao dịch CRB
     static func signTransaction(
         from: String,
         to: String,
@@ -83,10 +79,7 @@ enum WalletCore {
         privateKeyHex: String,
         publicKeyHex: String
     ) throws -> SignedCRBTransaction? {
-        // TODO: Phase 4 — Implement canonical tx byte serialization
-        // The exact byte format needs to be reverse-engineered from the reference wallet.
-        // Fields: from, to, amount, fee, nonce + chain_id binding
-        // Signing: ed25519 signature over canonical bytes
+        // Cần reverse format bytes từ reference wallet để implement ký transaction
         throw WalletError.signingNotImplemented
     }
     

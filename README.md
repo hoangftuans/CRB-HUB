@@ -12,6 +12,15 @@
 
 **CRB Hub** is a premium native iOS non-custodial wallet built using SwiftUI for the Cereblix (CRB) blockchain. The application delivers robust local key management, mining dashboard statistics, P2P exchange trading, and multi-language support (11 languages) with local fiat currency conversion.
 
+### 👤 Project Owner & Developer Support
+This project is owned and maintained by **Hoang Tuan Nguyen**. If you find this app helpful, please consider supporting the project to fund further development!
+
+* **Donation Address (Cereblix)**: `crb1bcf10b1d12f028f8a3583010c1be8f228360727b`
+* **Direct Donation**: You can donate directly inside the app's Settings menu.
+
+> [!IMPORTANT]
+> **Cereblix Native & Secured**: This app runs **100% on the Cereblix network**. All your wallets and private keys are **encrypted and stored securely in the iOS Keychain** (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`) protected by biometric Face ID/Touch ID. Your private keys never leave your device.
+
 ### 🌟 Key Features
 * **Non-Custodial Wallet Management**: Generate a random ed25519 keypair or import via a 64-character hex private key. Securely encrypted and stored locally in the iOS Keychain.
 * **Biometric Verification**: Verify sensitive actions (key export, trade actions) using Face ID / Touch ID.
@@ -86,6 +95,15 @@ graph TD
 [![License](https://img.shields.io/badge/Gi%E1%BA%A5y%20Ph%C3%A9p-MIT-green.svg)](LICENSE)
 
 **CRB Hub** là ứng dụng ví phi lưu ký (non-custodial wallet) chạy native trên hệ điều hành iOS dành cho mạng lưới Cereblix (CRB). Ứng dụng cung cấp các tính năng quản lý tài sản bảo mật cao, theo dõi khai thác (mining monitoring), trao đổi giao dịch P2P OTC và tích hợp đa ngôn ngữ toàn diện.
+
+### 👤 Chủ Sở Hữu & Ủng Hộ Phát Triển
+Dự án được sở hữu và phát triển bởi **Hoang Tuan Nguyen**. Mọi sự ủng hộ (donate) từ cộng đồng sẽ là nguồn động lực to lớn để tiếp tục nâng cấp và phát triển ứng dụng trong tương lai!
+
+* **Địa chỉ ví nhận ủng hộ (Cereblix)**: `crb1bcf10b1d12f028f8a3583010c1be8f228360727b`
+* **Gửi trực tiếp**: Bạn có thể thực hiện gửi tiền ủng hộ trực tiếp trong phần Cài đặt (Settings) của ứng dụng.
+
+> [!IMPORTANT]
+> **Hoạt động 100% trên Cereblix**: Dự án được xây dựng và chạy **100% trực tiếp trên mạng lưới Cereblix**. Tất cả thông tin ví và khóa bí mật được **mã hóa và lưu trữ hoàn toàn bảo mật trong Keychain** của thiết bị iOS (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`), kết hợp bảo vệ bằng sinh trắc học Face ID / Touch ID. Khóa bí mật của bạn không bao giờ rời khỏi thiết bị.
 
 ### 🌟 Tính Năng Chính
 * **Quản Lý Ví Bảo Mật**: Tạo ví mới (sinh cặp khóa ed25519 ngẫu nhiên) hoặc nhập ví cũ (qua khóa bí mật Hex 64 ký tự). Khóa được mã hóa và lưu trữ an toàn cục bộ trong iOS Keychain.

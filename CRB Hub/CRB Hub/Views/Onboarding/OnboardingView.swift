@@ -39,9 +39,10 @@ struct OnboardingView: View {
                             .fill(CRBTheme.Colors.violet.opacity(0.08))
                             .frame(width: 110, height: 110)
                         
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 52, weight: .light))
-                            .foregroundStyle(CRBTheme.Gradients.primary)
+                        Image("Logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 72, height: 72)
                     }
                     .onAppear { pulseAnimation = true }
                     
