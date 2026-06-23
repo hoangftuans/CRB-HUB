@@ -56,6 +56,7 @@ struct P2POffer: Codable, Identifiable {
     let Price: Decimal?
     let MinCRB: Decimal?
     let MaxCRB: Decimal?
+    let MakerUSDT: String?
     let Info: String?
     let Olympus: Bool?
     
@@ -123,6 +124,8 @@ struct P2PTrade: Codable, Identifiable {
     // Escrow & details
     let Maker: String?
     let Taker: String?
+    let MakerUSDT: String?
+    let TakerUSDT: String?
     let EscrowCRB: String?
     let EscrowUSDT: String?
     let CRBLocked: Bool?

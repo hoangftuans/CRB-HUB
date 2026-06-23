@@ -106,7 +106,7 @@ final class AppState {
         }
     }
 
-    var cachedFXRates: [String: Double] = CurrencyManager.fallbackRates {
+    var cachedFXRates: [String: Decimal] = CurrencyManager.fallbackRates {
         didSet {
             if let data = try? JSONEncoder().encode(cachedFXRates) {
                 UserDefaults.standard.set(data, forKey: "cached_fx_rates")
@@ -114,9 +114,9 @@ final class AppState {
         }
     }
 
-    var cachedCRBPriceUSDT: Double = 0.0 {
+    var cachedCRBPriceUSDT: Decimal = 0 {
         didSet {
-            UserDefaults.standard.set(cachedCRBPriceUSDT, forKey: "cached_crb_price_usdt")
+            UserDefaults.standard.set(NSDecimalNumber(decimal: cachedCRBPriceUSDT).stringValue, forKey: "cached_crb_price_usdt")
         }
     }
 
@@ -124,6 +124,18 @@ final class AppState {
     var linkedUSDTWallets: [USDTWallet] = [] {
         didSet {
             saveUSDTWallets()
+        }
+    }
+
+    var p2pWalletBindings: [P2PWalletBinding] = [] {
+        didSet {
+            saveP2PWalletBindings()
+        }
+    }
+
+    var defaultP2PUSDTWalletIdsByRail: [String: UUID] = [:] {
+        didSet {
+            saveDefaultP2PUSDTWallets()
         }
     }
 
@@ -156,19 +168,39 @@ final class AppState {
         if let manualOverride = UserDefaults.standard.string(forKey: "manual_currency_override") {
             manualCurrencyOverride = manualOverride
         }
-        if let ratesData = UserDefaults.standard.data(forKey: "cached_fx_rates"),
-           let rates = try? JSONDecoder().decode([String: Double].self, from: ratesData) {
-            cachedFXRates = rates
+        if let ratesData = UserDefaults.standard.data(forKey: "cached_fx_rates") {
+            if let rates = try? JSONDecoder().decode([String: Decimal].self, from: ratesData) {
+                cachedFXRates = rates
+            } else if let legacyRates = try? JSONDecoder().decode([String: Double].self, from: ratesData) {
+                cachedFXRates = legacyRates.compactMapValues { Decimal(string: String($0)) }
+            }
         }
-        let savedPrice = UserDefaults.standard.double(forKey: "cached_crb_price_usdt")
-        if savedPrice > 0 {
+        if let savedPriceString = UserDefaults.standard.string(forKey: "cached_crb_price_usdt"),
+           let savedPrice = Decimal(string: savedPriceString),
+           savedPrice > 0 {
             cachedCRBPriceUSDT = savedPrice
+        } else {
+            let legacySavedPrice = UserDefaults.standard.double(forKey: "cached_crb_price_usdt")
+            if legacySavedPrice > 0,
+               let migratedPrice = Decimal(string: String(legacySavedPrice)) {
+                cachedCRBPriceUSDT = migratedPrice
+            }
         }
 
         // Load linked USDT wallets
         if let usdtData = UserDefaults.standard.data(forKey: "linked_usdt_wallets"),
            let loaded = try? JSONDecoder().decode([USDTWallet].self, from: usdtData) {
             linkedUSDTWallets = loaded
+        }
+
+        if let bindingData = UserDefaults.standard.data(forKey: "p2p_wallet_bindings"),
+           let loaded = try? JSONDecoder().decode([P2PWalletBinding].self, from: bindingData) {
+            p2pWalletBindings = loaded
+        }
+
+        if let defaultsData = UserDefaults.standard.data(forKey: "default_p2p_usdt_wallets"),
+           let loaded = try? JSONDecoder().decode([String: UUID].self, from: defaultsData) {
+            defaultP2PUSDTWalletIdsByRail = loaded
         }
     }
 
@@ -235,8 +267,154 @@ final class AppState {
         linkedUSDTWallets.append(wallet)
     }
 
+    func upsertUSDTWallet(_ wallet: USDTWallet) {
+        if let index = linkedUSDTWallets.firstIndex(where: {
+            $0.provider == wallet.provider &&
+            $0.network == wallet.network &&
+            $0.address == wallet.address
+        }) {
+            var updated = wallet
+            updated.id = linkedUSDTWallets[index].id
+            updated.balance = linkedUSDTWallets[index].balance
+            linkedUSDTWallets[index] = updated
+        } else {
+            linkedUSDTWallets.append(wallet)
+        }
+    }
+
     func deleteUSDTWallet(id: UUID) {
         linkedUSDTWallets.removeAll { $0.id == id }
+        p2pWalletBindings.removeAll { $0.usdtWalletId == id }
+        defaultP2PUSDTWalletIdsByRail = defaultP2PUSDTWalletIdsByRail.filter { $0.value != id }
+    }
+
+    func setDefaultP2PUSDTWallet(_ wallet: USDTWallet, rail: String) {
+        defaultP2PUSDTWalletIdsByRail[rail.lowercased()] = wallet.id
+    }
+
+    func defaultP2PUSDTWallet(for rail: String) -> USDTWallet? {
+        let cleanRail = rail.lowercased()
+        if let id = defaultP2PUSDTWalletIdsByRail[cleanRail],
+           let wallet = linkedUSDTWallets.first(where: { $0.id == id && $0.network.p2pRail == cleanRail }) {
+            return wallet
+        }
+        return linkedUSDTWallets.first { $0.network.p2pRail == cleanRail }
+    }
+
+    func bindP2PWallet(
+        kind: P2PWalletBinding.BindingKind,
+        p2pId: String,
+        role: P2PWalletBinding.Role,
+        usdtAddress: String,
+        usdtNetwork: USDTNetwork,
+        usdtWalletId: UUID?
+    ) {
+        guard let wallet = selectedWallet else { return }
+        let cleanId = p2pId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanUSDTAddress = usdtAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanId.isEmpty, !cleanUSDTAddress.isEmpty else { return }
+
+        let binding = P2PWalletBinding(
+            kind: kind,
+            p2pId: cleanId,
+            role: role,
+            crbWalletId: wallet.id,
+            crbAddress: wallet.address,
+            usdtWalletId: usdtWalletId,
+            usdtAddress: cleanUSDTAddress,
+            usdtNetwork: usdtNetwork,
+            rail: usdtNetwork.p2pRail ?? "",
+            createdAt: Date()
+        )
+
+        p2pWalletBindings.removeAll { $0.kind == kind && $0.p2pId == cleanId && $0.role == role }
+        p2pWalletBindings.append(binding)
+    }
+
+    func p2pBinding(kind: P2PWalletBinding.BindingKind, p2pId: String, role: P2PWalletBinding.Role? = nil) -> P2PWalletBinding? {
+        p2pWalletBindings.last {
+            $0.kind == kind &&
+            $0.p2pId == p2pId &&
+            (role == nil || $0.role == role)
+        }
+    }
+
+    func p2pBoundUSDTWallet(kind: P2PWalletBinding.BindingKind, p2pId: String, role: P2PWalletBinding.Role? = nil) -> USDTWallet? {
+        guard let binding = p2pBinding(kind: kind, p2pId: p2pId, role: role) else {
+            return nil
+        }
+        if let walletId = binding.usdtWalletId,
+           let wallet = linkedUSDTWallets.first(where: { $0.id == walletId }) {
+            return wallet
+        }
+        return linkedUSDTWallets.first {
+            $0.address.caseInsensitiveCompare(binding.usdtAddress) == .orderedSame &&
+            $0.network == binding.usdtNetwork
+        }
+    }
+
+    func hydrateP2PWalletBindings(offers: [P2POffer] = [], trades: [P2PTrade] = []) {
+        for offer in offers {
+            guard let makerUSDT = offer.MakerUSDT else { continue }
+            hydrateP2PWalletBinding(
+                kind: .offer,
+                p2pId: offer.ID,
+                role: .maker,
+                usdtAddress: makerUSDT,
+                rail: offer.Rail
+            )
+        }
+
+        for trade in trades {
+            guard let tradeId = trade.ID else { continue }
+            if trade.MakerAddr == selectedWallet?.address, let makerUSDT = trade.MakerUSDT {
+                hydrateP2PWalletBinding(
+                    kind: .trade,
+                    p2pId: tradeId,
+                    role: .maker,
+                    usdtAddress: makerUSDT,
+                    rail: trade.Rail
+                )
+            }
+            if trade.TakerAddr == selectedWallet?.address, let takerUSDT = trade.TakerUSDT {
+                hydrateP2PWalletBinding(
+                    kind: .trade,
+                    p2pId: tradeId,
+                    role: .taker,
+                    usdtAddress: takerUSDT,
+                    rail: trade.Rail
+                )
+            }
+        }
+    }
+
+    private func hydrateP2PWalletBinding(
+        kind: P2PWalletBinding.BindingKind,
+        p2pId: String,
+        role: P2PWalletBinding.Role,
+        usdtAddress: String,
+        rail: String?
+    ) {
+        guard p2pBinding(kind: kind, p2pId: p2pId, role: role) == nil else { return }
+        let cleanRail = rail?.lowercased() ?? ""
+        let cleanAddress = usdtAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanAddress.isEmpty else { return }
+
+        let linkedWallet = linkedUSDTWallets.first {
+            $0.address.caseInsensitiveCompare(cleanAddress) == .orderedSame &&
+            $0.network.p2pRail == cleanRail
+        }
+        let network = linkedWallet?.network ?? (cleanRail == "solana" ? USDTNetwork.solana : USDTNetwork.polygon)
+        guard USDTNetwork.isValidP2PAddress(cleanAddress, rail: cleanRail) else { return }
+
+        bindP2PWallet(
+            kind: kind,
+            p2pId: p2pId,
+            role: role,
+            usdtAddress: cleanAddress,
+            usdtNetwork: network,
+            usdtWalletId: linkedWallet?.id
+        )
     }
 
     func refreshUSDTBalances() async {
@@ -257,6 +435,18 @@ final class AppState {
         }
     }
 
+    private func saveP2PWalletBindings() {
+        if let data = try? JSONEncoder().encode(p2pWalletBindings) {
+            UserDefaults.standard.set(data, forKey: "p2p_wallet_bindings")
+        }
+    }
+
+    private func saveDefaultP2PUSDTWallets() {
+        if let data = try? JSONEncoder().encode(defaultP2PUSDTWalletIdsByRail) {
+            UserDefaults.standard.set(data, forKey: "default_p2p_usdt_wallets")
+        }
+    }
+
     // MARK: - Background Refresh
 
     func refreshChainStatus() async {
@@ -272,7 +462,7 @@ final class AppState {
             let stats = try await P2PAPIClient.getStats()
             p2pStats = stats
             if let price = stats.price_usdt, price > 0 {
-                cachedCRBPriceUSDT = NSDecimalNumber(decimal: price).doubleValue
+                cachedCRBPriceUSDT = price
             }
         } catch {
             return

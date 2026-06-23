@@ -111,7 +111,7 @@ final class P2PViewModel {
     
     // MARK: - Trading Actions
     
-    func loadMyData(token: String) async {
+    func loadMyData(token: String, appState: AppState? = nil) async {
         isLoadingMyData = true
         
         do {
@@ -120,6 +120,7 @@ final class P2PViewModel {
             
             myOffers = try await o
             myTrades = try await t
+            appState?.hydrateP2PWalletBindings(offers: myOffers, trades: myTrades)
         } catch {
             // Handle auth errors
             if case CRBAPIError.unauthorized(_) = error {
@@ -130,9 +131,9 @@ final class P2PViewModel {
         isLoadingMyData = false
     }
     
-    func createOffer(token: String, offer: CreateOfferRequest) async throws -> P2POffer {
+    func createOffer(token: String, offer: CreateOfferRequest, appState: AppState? = nil) async throws -> P2POffer {
         let created = try await P2PAPIClient.createOffer(token: token, offer: offer)
-        await loadMyData(token: token)
+        await loadMyData(token: token, appState: appState)
         return created
     }
     
@@ -141,9 +142,9 @@ final class P2PViewModel {
         await loadMyData(token: token)
     }
     
-    func takeOffer(token: String, request: TakeOfferRequest) async throws -> P2PTrade {
+    func takeOffer(token: String, request: TakeOfferRequest, appState: AppState? = nil) async throws -> P2PTrade {
         let trade = try await P2PAPIClient.takeOffer(token: token, request: request)
-        await loadMyData(token: token)
+        await loadMyData(token: token, appState: appState)
         return trade
     }
     

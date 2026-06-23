@@ -12,6 +12,9 @@ struct SendView: View {
     @State private var isSending = false
     @State private var error: String?
     @State private var sendResult: BroadcastResult?
+    @State private var fallbackPassword = ""
+    @State private var requiresPassword = false
+    @State private var walletViewModel = WalletViewModel()
     
     init(prefilledAddress: String = "", prefilledAmount: String? = nil) {
         _recipientAddress = State(initialValue: prefilledAddress)
@@ -48,7 +51,7 @@ struct SendView: View {
     }
     
     var canSend: Bool {
-        isValidAddress && baseUnitAmount != nil && hasEnoughBalance && !isSending
+        isValidAddress && baseUnitAmount != nil && hasEnoughBalance && !isSending && (!requiresPassword || !fallbackPassword.isEmpty)
     }
     
     var body: some View {
@@ -77,30 +80,29 @@ struct SendView: View {
     
     private var sendForm: some View {
         VStack(spacing: CRBTheme.Spacing.xl) {
-            // 🔒 Security audit notice — Send is frozen
             VStack(spacing: CRBTheme.Spacing.md) {
                 HStack(spacing: CRBTheme.Spacing.md) {
-                    Image(systemName: "lock.shield.fill")
+                    Image(systemName: "faceid")
                         .font(.system(size: 24))
-                        .foregroundColor(CRBTheme.Colors.warning)
+                        .foregroundColor(CRBTheme.Colors.cyan)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Security Audit in Progress".localized)
+                        Text("Secure Transfer".localized)
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(CRBTheme.Colors.warning)
+                            .foregroundColor(CRBTheme.Colors.ink)
                         
-                        Text("Transaction signing is disabled pending security audit. Your funds are safe — no transactions can be sent until the signing module is fully verified.".localized)
+                        Text("Face ID is required before this wallet signs and broadcasts the transaction. If Face ID fails, enter your wallet password.".localized)
                             .font(.system(size: 12))
                             .foregroundColor(CRBTheme.Colors.muted)
                     }
                 }
             }
             .padding(CRBTheme.Spacing.lg)
-            .background(CRBTheme.Colors.warning.opacity(0.08))
+            .background(CRBTheme.Colors.cyan.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
             .overlay(
                 RoundedRectangle(cornerRadius: CRBTheme.Radius.md)
-                    .stroke(CRBTheme.Colors.warning.opacity(0.3), lineWidth: 1)
+                    .stroke(CRBTheme.Colors.cyan.opacity(0.3), lineWidth: 1)
             )
             
             if let bal = balance {
@@ -232,19 +234,37 @@ struct SendView: View {
                     .font(CRBTheme.Typography.caption())
                     .foregroundColor(CRBTheme.Colors.error)
             }
-            
-            // Send button (disabled for now — signing not implemented)
-            GradientButton(
-                title: "Send CRB".localized,
-                icon: "paperplane.fill",
-                isDisabled: true  // Disabled until signing is implemented
-            ) {
-                // Will implement when transaction signing is ready
+
+            if requiresPassword {
+                VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+                    Text("Wallet Password".localized)
+                        .font(CRBTheme.Typography.caption())
+                        .foregroundColor(CRBTheme.Colors.muted)
+
+                    SecureField("Enter wallet password".localized, text: $fallbackPassword)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(CRBTheme.Colors.ink)
+                        .padding(CRBTheme.Spacing.md)
+                        .background(CRBTheme.Colors.backgroundSecondary)
+                        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: CRBTheme.Radius.md)
+                                .stroke(CRBTheme.Colors.cardBorder, lineWidth: 1)
+                        )
+                }
+                .glassCard()
             }
             
-            Text("Transaction signing is under development".localized)
-                .font(.system(size: 11))
-                .foregroundColor(CRBTheme.Colors.muted.opacity(0.6))
+            GradientButton(
+                title: isSending ? "Sending...".localized : "Send CRB".localized,
+                icon: "paperplane.fill",
+                isDisabled: !canSend
+            ) {
+                Task {
+                    await sendCRB()
+                }
+            }
         }
     }
     
@@ -302,6 +322,42 @@ struct SendView: View {
             }
         }
         isLoading = false
+    }
+
+    private func sendCRB() async {
+        guard let wallet = appState.selectedWallet else {
+            error = "No active wallet selected.".localized
+            return
+        }
+        guard let amount = baseUnitAmount else {
+            error = "Invalid Amount".localized
+            return
+        }
+
+        isSending = true
+        error = nil
+        await walletViewModel.sendCRBSecure(
+            wallet: wallet,
+            to: recipientAddress.trimmingCharacters(in: .whitespacesAndNewlines),
+            amount: amount,
+            fee: feeSuggested,
+            fallbackPassword: requiresPassword ? fallbackPassword : nil
+        )
+        isSending = false
+
+        if let result = walletViewModel.sendResult {
+            sendResult = result
+            requiresPassword = false
+            fallbackPassword = ""
+            await loadData()
+            return
+        }
+
+        let message = walletViewModel.sendError ?? "Transaction failed.".localized
+        if message.localizedCaseInsensitiveContains("Face ID failed") {
+            requiresPassword = true
+        }
+        error = message
     }
 }
 

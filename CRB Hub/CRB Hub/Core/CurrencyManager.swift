@@ -9,17 +9,17 @@ enum CurrencyManager {
     ]
     
     /// Predefined hardcoded fallback exchange rates (USDT -> Fiat)
-    static let fallbackRates: [String: Double] = [
-        "USD": 1.0,
-        "VND": 25400.0,
-        "EUR": 0.92,
-        "CNY": 7.25,
-        "JPY": 158.0,
-        "KRW": 1380.0,
-        "THB": 36.7,
-        "IDR": 16400.0,
-        "RUB": 88.0,
-        "GBP": 0.79
+    static let fallbackRates: [String: Decimal] = [
+        "USD": Decimal(string: "1.0")!,
+        "VND": Decimal(string: "25400.0")!,
+        "EUR": Decimal(string: "0.92")!,
+        "CNY": Decimal(string: "7.25")!,
+        "JPY": Decimal(string: "158.0")!,
+        "KRW": Decimal(string: "1380.0")!,
+        "THB": Decimal(string: "36.7")!,
+        "IDR": Decimal(string: "16400.0")!,
+        "RUB": Decimal(string: "88.0")!,
+        "GBP": Decimal(string: "0.79")!
     ]
     
     /// Detects system default currency based on system region settings
@@ -63,27 +63,27 @@ enum CurrencyManager {
     /// Returns nil if price is unavailable
     static func convertCRBToFiat(
         baseUnits: UInt64,
-        priceUSDT: Double?,
-        rates: [String: Double],
+        priceUSDT: Decimal?,
+        rates: [String: Decimal],
         targetCurrency: String
     ) -> Decimal? {
         guard let price = priceUSDT, price > 0 else { return nil }
         let crbDecimal = CRBUnits.toDisplayCRB(baseUnits)
-        let rate = rates[targetCurrency] ?? fallbackRates[targetCurrency] ?? 1.0
-        return crbDecimal * Decimal(price) * Decimal(rate)
+        let rate = rates[targetCurrency] ?? fallbackRates[targetCurrency] ?? 1
+        return crbDecimal * price * rate
     }
     
     /// Convert CRB Decimal amount to target fiat currency
     /// Returns nil if price is unavailable
     static func convertCRBToFiat(
         crbAmount: Decimal,
-        priceUSDT: Double?,
-        rates: [String: Double],
+        priceUSDT: Decimal?,
+        rates: [String: Decimal],
         targetCurrency: String
     ) -> Decimal? {
         guard let price = priceUSDT, price > 0 else { return nil }
-        let rate = rates[targetCurrency] ?? fallbackRates[targetCurrency] ?? 1.0
-        return crbAmount * Decimal(price) * Decimal(rate)
+        let rate = rates[targetCurrency] ?? fallbackRates[targetCurrency] ?? 1
+        return crbAmount * price * rate
     }
     
     /// Format fiat amount to localized currency string (e.g. "$123.45", "123.450 ₫")

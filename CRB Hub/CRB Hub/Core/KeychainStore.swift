@@ -12,6 +12,7 @@ final class KeychainStore {
     static let shared = KeychainStore()
 
     private let service = "com.crbhub.wallet"
+    private let securityService = "com.crbhub.wallet.security"
     private let accountListKey = "wallet_accounts"
     /// Legacy service tag used before the biometric migration
     private let legacyService = "com.crbhub.wallet"
@@ -217,6 +218,69 @@ final class KeychainStore {
         }
 
         return privateKeyHex
+    }
+
+    /// Load a private key for a transaction-signing path.
+    /// All coin transfers must use this method so Face ID / Touch ID is enforced
+    /// by the Keychain before any signing or broadcast attempt.
+    func loadPrivateKeyForTransaction(for walletId: UUID, amountDescription: String) async throws -> String {
+        try await loadPrivateKeySecure(
+            for: walletId,
+            reason: "Authenticate to send \(amountDescription)"
+        )
+    }
+
+    func saveGenericSecret(_ data: Data, account: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: securityService,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
+
+        let addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: securityService,
+            kSecAttrAccount as String: account,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            kSecValueData as String: data,
+        ]
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw KeychainError.saveFailed(status)
+        }
+    }
+
+    func loadGenericSecret(account: String) throws -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: securityService,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound {
+            return nil
+        }
+        guard status == errSecSuccess else {
+            throw KeychainError.loadFailed(status)
+        }
+        guard let data = result as? Data else {
+            throw KeychainError.invalidData
+        }
+        return data
+    }
+
+    func deleteGenericSecret(account: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: securityService,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     /// Delete private key from Keychain (raw, no auth required for deletion)

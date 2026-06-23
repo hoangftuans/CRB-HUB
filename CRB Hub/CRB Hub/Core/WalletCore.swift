@@ -115,11 +115,49 @@ enum WalletCore {
         fee: UInt64,
         nonce: UInt64,
         chainId: String?,
+        signingHeight: UInt64,
         privateKeyHex: String,
         publicKeyHex: String
     ) throws -> SignedCRBTransaction? {
-        // Cần reverse format bytes từ reference wallet để implement ký transaction
-        throw WalletError.signingNotImplemented
+        guard AddressValidator.isValidAddress(from), AddressValidator.isValidAddress(to), amount > 0 else {
+            throw WalletError.invalidTransaction
+        }
+
+        guard let keyData = Data(hexString: privateKeyHex), keyData.count == 32 else {
+            throw WalletError.invalidPrivateKey
+        }
+
+        guard let expectedPublicKey = Data(hexString: publicKeyHex), expectedPublicKey.count == 32 else {
+            throw WalletError.invalidPublicKey
+        }
+
+        let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: keyData)
+        let publicKeyData = privateKey.publicKey.rawRepresentation
+        guard publicKeyData == expectedPublicKey, deriveAddress(from: publicKeyData) == from else {
+            throw WalletError.invalidPublicKey
+        }
+
+        let payload: String
+        if signingHeight >= 700 {
+            guard let chainId, !chainId.isEmpty else {
+                throw WalletError.missingChainId
+            }
+            payload = "cerebra-tx-v1|\(chainId)|\(publicKeyHex)|\(to)|\(amount)|\(fee)|\(nonce)"
+        } else {
+            payload = "cerebra-tx-v1|\(publicKeyHex)|\(to)|\(amount)|\(fee)|\(nonce)"
+        }
+
+        let signature = try privateKey.signature(for: Data(payload.utf8)).hexString
+        return SignedCRBTransaction(
+            from: from,
+            to: to,
+            amount: amount,
+            fee: fee,
+            nonce: nonce,
+            pubkey: publicKeyHex,
+            sig: signature,
+            chain_id: chainId
+        )
     }
 
     // MARK: - Errors
@@ -127,8 +165,9 @@ enum WalletCore {
     enum WalletError: LocalizedError {
         case invalidPrivateKey
         case invalidPublicKey
+        case invalidTransaction
+        case missingChainId
         case signingFailed
-        case signingNotImplemented
         case invalidNonce
         case invalidLoginMessage
 
@@ -138,10 +177,12 @@ enum WalletCore {
                 return "Invalid private key format. Expected 64 hex characters (32 bytes)."
             case .invalidPublicKey:
                 return "Invalid public key format."
+            case .invalidTransaction:
+                return "Invalid transaction details."
+            case .missingChainId:
+                return "Missing chain ID for this transaction."
             case .signingFailed:
                 return "Failed to sign the message."
-            case .signingNotImplemented:
-                return "Transaction signing is not yet implemented. The canonical byte format from the Cereblix reference wallet is required."
             case .invalidNonce:
                 return "Invalid P2P login nonce. The server returned a malformed challenge."
             case .invalidLoginMessage:

@@ -61,6 +61,17 @@ struct SignedCRBTransaction: Codable {
     let pubkey: String
     let sig: String
     let chain_id: String?
+
+    enum CodingKeys: String, CodingKey {
+        case from
+        case to
+        case amount
+        case fee
+        case nonce
+        case pubkey = "from_pub"
+        case sig
+        case chain_id
+    }
 }
 
 /// Response from POST /api/tx

@@ -22,7 +22,7 @@ struct P2POffersView: View {
             }
             .refreshable {
                 if let token = appState.p2pToken {
-                    await viewModel.loadMyData(token: token)
+                    await viewModel.loadMyData(token: token, appState: appState)
                 }
             }
         }
@@ -40,7 +40,13 @@ struct P2POffersView: View {
         }
         .task {
             if let token = appState.p2pToken {
-                await viewModel.loadMyData(token: token)
+                await viewModel.loadMyData(token: token, appState: appState)
+            }
+            await refreshLiveRates(includeFiat: true)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                await refreshLiveRates(includeFiat: false)
             }
         }
         .sheet(isPresented: $showCreateOffer) {
@@ -61,16 +67,19 @@ struct P2POffersView: View {
                 EmptyStateView(icon: "tag", title: "No Offers".localized, message: "Create an offer to start trading".localized)
             } else {
                 ForEach(viewModel.myOffers) { offer in
-                    HStack(spacing: CRBTheme.Spacing.md) {
-                        PillBadge(
-                            text: offer.sideLabel,
-                            color: offer.isSellCRB ? CRBTheme.Colors.sellRed : CRBTheme.Colors.buyGreen
-                        )
-                        
-                        let currency = appState.selectedFiatCurrency
+                        HStack(spacing: CRBTheme.Spacing.md) {
+                            PillBadge(
+                                text: offer.sideLabel.localized,
+                                color: offer.isSellCRB ? CRBTheme.Colors.sellRed : CRBTheme.Colors.buyGreen
+                            )
+                            if appState.p2pBinding(kind: .offer, p2pId: offer.ID, role: .maker) != nil {
+                                PillBadge(text: "Bound".localized, color: CRBTheme.Colors.buyGreen)
+                            }
+
+                            let currency = appState.selectedFiatCurrency
                         let rates = appState.cachedFXRates
-                        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
-                        let offerPriceFiat = (offer.Price ?? 0) * Decimal(rate)
+                        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1
+                        let offerPriceFiat = (offer.Price ?? 0) * rate
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(CRBUnits.formatUSDT(offer.Price ?? 0))
@@ -124,13 +133,13 @@ struct P2POffersView: View {
                     } label: {
                         let currency = appState.selectedFiatCurrency
                         let rates = appState.cachedFXRates
-                        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
+                        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1
                         
                         HStack(spacing: CRBTheme.Spacing.md) {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     PillBadge(text: trade.stateLabel.localized, color: stateColor(trade.State ?? ""))
-                                    PillBadge(text: trade.Side == "sell_crb" ? "SELLOffers".localized : "BUYOffers".localized,
+                                    PillBadge(text: (trade.Side == "sell_crb" ? "SELL" : "BUY").localized,
                                             color: trade.Side == "sell_crb" ? CRBTheme.Colors.sellRed : CRBTheme.Colors.buyGreen)
                                 }
                                 
@@ -138,7 +147,7 @@ struct P2POffersView: View {
                                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                                     .foregroundColor(CRBTheme.Colors.ink)
                                 
-                                Text("≈ " + CurrencyManager.formatFiat((trade.AmountUSDT ?? 0) * Decimal(rate), currencyCode: currency))
+                                Text("≈ " + CurrencyManager.formatFiat((trade.AmountUSDT ?? 0) * rate, currencyCode: currency))
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundColor(CRBTheme.Colors.muted)
                             }
@@ -176,6 +185,7 @@ struct P2POffersView: View {
     @State private var offerMaxCRB = ""
     @State private var offerMakerUSDT = ""
     @State private var offerInfo = ""
+    @State private var selectedMakerUSDTWalletId: UUID?
     @State private var isCreatingOffer = false
     @State private var createOfferError: String?
     
@@ -194,10 +204,15 @@ struct P2POffersView: View {
                         
                         // Rail picker
                         HStack(spacing: CRBTheme.Spacing.md) {
-                            railButton("Polygon", value: "polygon")
-                            railButton("Solana", value: "solana")
+                            ForEach(USDTNetwork.p2pSupportedNetworks) { network in
+                                if let rail = network.p2pRail {
+                                    railButton(network.p2pReceiveLabel, value: rail)
+                                }
+                            }
                         }
-                        
+
+                        liveRateCard
+
                         // Price
                         inputField("Price (USDT)".localized, text: $offerPrice, placeholder: "0.00", keyboard: .decimalPad)
                         
@@ -208,7 +223,11 @@ struct P2POffersView: View {
                         }
                         
                         // USDT address
-                        inputField("Maker USDT Address".localized, text: $offerMakerUSDT, placeholder: "0x... or ...", keyboard: .default)
+                        makerUSDTWalletPicker
+                        inputField(String(format: "Maker %@ Receiving Address".localized, railReceiveLabel(offerRail)), text: $offerMakerUSDT, placeholder: railPlaceholder(offerRail), keyboard: .default)
+                            .onChange(of: offerMakerUSDT) { _, newValue in
+                                syncMakerWalletSelection(address: newValue, rail: offerRail)
+                            }
                         
                         // Info
                         inputField("Note (optional)".localized, text: $offerInfo, placeholder: "Any message for takers", keyboard: .default)
@@ -238,6 +257,11 @@ struct P2POffersView: View {
                         .foregroundColor(CRBTheme.Colors.muted)
                 }
             }
+            .onAppear {
+                if offerMakerUSDT.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    selectDefaultMakerWallet(for: offerRail)
+                }
+            }
         }
     }
     
@@ -257,7 +281,10 @@ struct P2POffersView: View {
     
     private func railButton(_ title: String, value: String) -> some View {
         Button {
-            withAnimation { offerRail = value }
+            withAnimation {
+                offerRail = value
+                selectDefaultMakerWallet(for: value)
+            }
         } label: {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
@@ -270,6 +297,191 @@ struct P2POffersView: View {
                     RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
                         .stroke(offerRail == value ? CRBTheme.Colors.violet.opacity(0.3) : CRBTheme.Colors.cardBorder, lineWidth: 1)
                 )
+        }
+    }
+
+    private var makerUSDTWalletPicker: some View {
+        let wallets = matchingUSDTWallets(for: offerRail)
+
+        return VStack(alignment: .leading, spacing: CRBTheme.Spacing.xs) {
+            Text("Use Existing USDT Wallet".localized)
+                .font(CRBTheme.Typography.caption())
+                .foregroundColor(CRBTheme.Colors.muted)
+
+            if wallets.isEmpty {
+                Text(String(format: "No linked %@ wallet yet. Add one in Settings or paste a matching address manually.".localized, railReceiveLabel(offerRail)))
+                    .font(.system(size: 12))
+                    .foregroundColor(CRBTheme.Colors.warning)
+                    .padding(CRBTheme.Spacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(CRBTheme.Colors.warning.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            } else {
+                Menu {
+                    ForEach(wallets) { wallet in
+                        Button {
+                            selectedMakerUSDTWalletId = wallet.id
+                            offerMakerUSDT = wallet.address
+                        } label: {
+                            Text("\(wallet.name) • \(AddressValidator.truncatedAddress(wallet.address, leading: 8, trailing: 6))")
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "wallet.pass.fill")
+                        Text(selectedMakerUSDTWalletLabel ?? "Select linked wallet".localized)
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(CRBTheme.Colors.ink)
+                    .padding(CRBTheme.Spacing.md)
+                    .background(CRBTheme.Colors.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
+                            .stroke(CRBTheme.Colors.cardBorder, lineWidth: 1)
+                    )
+                }
+            }
+        }
+    }
+
+    private var selectedMakerUSDTWalletLabel: String? {
+        guard let id = selectedMakerUSDTWalletId,
+              let wallet = appState.linkedUSDTWallets.first(where: { $0.id == id }) else {
+            return nil
+        }
+        return "\(wallet.name) • \(wallet.network.displayName)"
+    }
+
+    private func matchingUSDTWallets(for rail: String) -> [USDTWallet] {
+        appState.linkedUSDTWallets.filter { $0.network.p2pRail == rail.lowercased() }
+    }
+
+    private func selectDefaultMakerWallet(for rail: String) {
+        if let wallet = appState.defaultP2PUSDTWallet(for: rail) ?? matchingUSDTWallets(for: rail).first {
+            selectedMakerUSDTWalletId = wallet.id
+            offerMakerUSDT = wallet.address
+        } else {
+            selectedMakerUSDTWalletId = nil
+            offerMakerUSDT = ""
+        }
+    }
+
+    private func linkedUSDTWallet(address: String, rail: String) -> USDTWallet? {
+        let cleanAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanAddress.isEmpty else { return nil }
+        return appState.linkedUSDTWallets.first {
+            $0.address.caseInsensitiveCompare(cleanAddress) == .orderedSame &&
+            $0.network.p2pRail == rail.lowercased()
+        }
+    }
+
+    private func syncMakerWalletSelection(address: String, rail: String) {
+        if let wallet = linkedUSDTWallet(address: address, rail: rail) {
+            selectedMakerUSDTWalletId = wallet.id
+        } else if selectedMakerUSDTWalletId != nil {
+            selectedMakerUSDTWalletId = nil
+        }
+    }
+
+    private func railReceiveLabel(_ rail: String) -> String {
+        rail.lowercased() == "solana" ? "Solana USDT" : "Polygon USDT"
+    }
+
+    private func railPlaceholder(_ rail: String) -> String {
+        rail.lowercased() == "solana" ? "Solana address" : "0x..."
+    }
+
+    private var liveMarketPrice: Decimal? {
+        if let price = appState.p2pStats?.price_usdt, price > 0 {
+            return price
+        }
+        if appState.cachedCRBPriceUSDT > 0 {
+            return appState.cachedCRBPriceUSDT
+        }
+        return nil
+    }
+
+    private var selectedFiatRate: Decimal {
+        let currency = appState.selectedFiatCurrency
+        return appState.cachedFXRates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1
+    }
+
+    private var liveRateCard: some View {
+        let currency = appState.selectedFiatCurrency
+        let marketPrice = liveMarketPrice ?? 0
+        let marketFiat = marketPrice * selectedFiatRate
+        let enteredPrice = Decimal(string: offerPrice) ?? marketPrice
+        let maxCRB = Decimal(string: offerMaxCRB) ?? 0
+        let estimatedUSDT = enteredPrice * maxCRB
+        let estimatedFiat = estimatedUSDT * selectedFiatRate
+
+        return VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Live CRB/USDT".localized)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(CRBTheme.Colors.buyGreen)
+                    Text("\(CRBUnits.formatUSDT(marketPrice)) ≈ \(CurrencyManager.formatFiat(marketFiat, currencyCode: currency))")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(CRBTheme.Colors.ink)
+                }
+
+                Spacer()
+
+                Button {
+                    offerPrice = CRBUnits.formatDecimal(marketPrice, maxFractionDigits: 8, minFractionDigits: 0)
+                } label: {
+                    Image(systemName: "arrow.down.to.line.compact")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(CRBTheme.Colors.cyan)
+                        .padding(8)
+                        .background(CRBTheme.Colors.cyan.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .disabled(liveMarketPrice == nil)
+            }
+
+            HStack(spacing: CRBTheme.Spacing.md) {
+                ratePill("24h".localized, appState.p2pStats?.change_24h_pct ?? 0)
+                ratePill("7d".localized, appState.p2pStats?.change_7d_pct ?? 0)
+                Spacer()
+            }
+
+            if maxCRB > 0 {
+                Text(String(format: "Max order value: %@ ≈ %@".localized, CRBUnits.formatUSDT(estimatedUSDT), CurrencyManager.formatFiat(estimatedFiat, currencyCode: currency)))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(CRBTheme.Colors.muted)
+            }
+        }
+        .padding(CRBTheme.Spacing.md)
+        .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+        .overlay(
+            RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
+                .stroke(CRBTheme.Colors.buyGreen.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func ratePill(_ label: String, _ value: Double) -> some View {
+        let positive = value >= 0
+        return Text("\(label) \(positive ? "+" : "")\(String(format: "%.2f", value))%")
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .foregroundColor(positive ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.sellRed)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background((positive ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.sellRed).opacity(0.08))
+            .clipShape(Capsule())
+    }
+
+    private func refreshLiveRates(includeFiat: Bool) async {
+        await appState.refreshP2PStats()
+        if includeFiat {
+            await appState.refreshFiatRates()
         }
     }
     
@@ -303,7 +515,17 @@ struct P2POffersView: View {
             return
         }
         let minCRB = Decimal(string: offerMinCRB) ?? 0
-        
+        let cleanMakerUSDT = offerMakerUSDT.trimmingCharacters(in: .whitespacesAndNewlines)
+        let linkedWallet = linkedUSDTWallet(address: cleanMakerUSDT, rail: offerRail)
+        guard !cleanMakerUSDT.isEmpty else {
+            createOfferError = "Please select or enter a USDT wallet address"
+            return
+        }
+        guard USDTNetwork.isValidP2PAddress(cleanMakerUSDT, rail: offerRail) else {
+            createOfferError = String(format: "USDT wallet address must be a %@ address".localized, railReceiveLabel(offerRail))
+            return
+        }
+
         isCreatingOffer = true
         createOfferError = nil
         
@@ -316,12 +538,20 @@ struct P2POffersView: View {
                         price: price,
                         minCRB: minCRB,
                         maxCRB: maxCRB,
-                        makerUSDT: offerMakerUSDT.isEmpty ? nil : offerMakerUSDT,
+                        makerUSDT: cleanMakerUSDT,
                         info: offerInfo.isEmpty ? nil : offerInfo,
                         readySecs: nil,
                         olympus: nil
                     )
-                    let _ = try await viewModel.createOffer(token: token, offer: request)
+                    let createdOffer = try await viewModel.createOffer(token: token, offer: request, appState: appState)
+                    appState.bindP2PWallet(
+                        kind: .offer,
+                        p2pId: createdOffer.ID,
+                        role: .maker,
+                        usdtAddress: cleanMakerUSDT,
+                        usdtNetwork: linkedWallet?.network ?? selectedMakerUSDTNetwork(for: offerRail, address: cleanMakerUSDT),
+                        usdtWalletId: linkedWallet?.id ?? selectedMakerUSDTWalletId(for: cleanMakerUSDT)
+                    )
                     showCreateOffer = false
                 }
             } catch {
@@ -329,6 +559,24 @@ struct P2POffersView: View {
             }
             isCreatingOffer = false
         }
+    }
+
+    private func selectedMakerUSDTNetwork(for rail: String, address: String) -> USDTNetwork {
+        if let id = selectedMakerUSDTWalletId,
+           let wallet = appState.linkedUSDTWallets.first(where: {
+               $0.id == id &&
+               $0.address.caseInsensitiveCompare(address) == .orderedSame
+           }) {
+            return wallet.network
+        }
+        if let wallet = linkedUSDTWallet(address: address, rail: rail) {
+            return wallet.network
+        }
+        return rail.lowercased() == "solana" ? .solana : .polygon
+    }
+
+    private func selectedMakerUSDTWalletId(for address: String) -> UUID? {
+        linkedUSDTWallet(address: address, rail: offerRail)?.id
     }
 }
 

@@ -10,39 +10,69 @@ struct SettingsView: View {
     @State private var nodeURLInput = ""
     @State private var savedNodeURL = false
     @State private var copiedDonationAddress = false
+    @State private var walletPassword = ""
+    @State private var walletPasswordConfirm = ""
+    @State private var walletPasswordError: String?
+    @State private var walletPasswordSuccess: String?
+    @State private var isUpdatingWalletPassword = false
     
     // Địa chỉ ví nhận donate
     private let donationAddress = "crb1bcf10b1d12f028f8a3583010c1be8f228360727b"
+
+    private var appVersionText: String {
+        let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let build = (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let version, !version.isEmpty else {
+            if let build, !build.isEmpty {
+                return "Build \(build)"
+            }
+            return "Unknown"
+        }
+
+        if let build, !build.isEmpty, build != version {
+            return "\(version) (\(build))"
+        }
+        return version
+    }
     
     var body: some View {
         NavigationStack {
             ZStack {
                 CRBTheme.Colors.background.ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: CRBTheme.Spacing.xl) {
-                        // Wallets
-                        walletsSection
-                        
-                        // Node configuration
-                        nodeSection
-                        
-                        // Security
-                        securitySection
-                        
-                        // Currency & Region
-                        currencySection
-                        
-                        // USDT Wallets
-                        usdtWalletSection
-                        
-                        // Support Developer
-                        donateSection
-                        
-                        // About
-                        aboutSection
+                GeometryReader { geometry in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: CRBTheme.Spacing.xl) {
+                            // Wallets
+                            walletsSection
+
+                            // Node configuration
+                            nodeSection
+
+                            // Security
+                            securitySection
+
+                            // Currency & Region
+                            currencySection
+
+                            // USDT Wallets
+                            usdtWalletSection
+
+                            // SafeTrade API
+                            safeTradeAPISection
+
+                            // Support Developer
+                            donateSection
+
+                            // About
+                            aboutSection
+                        }
+                        .padding(CRBTheme.Spacing.lg)
+                        .frame(width: geometry.size.width, alignment: .top)
                     }
-                    .padding(CRBTheme.Spacing.lg)
                 }
             }
             .navigationTitle("Settings".localized)
@@ -86,6 +116,7 @@ struct SettingsView: View {
                         Text(wallet.name)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(CRBTheme.Colors.ink)
+                            .lineLimit(1)
                         
                         Text(AddressValidator.truncatedAddress(wallet.address))
                             .font(.system(size: 11, design: .monospaced))
@@ -303,16 +334,107 @@ struct SettingsView: View {
             }
             
             Divider().background(CRBTheme.Colors.cardBorder)
-            
+
+            walletPasswordSection
+
+            Divider().background(CRBTheme.Colors.cardBorder)
+
             VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                 securityItem("Private keys stored in iOS Keychain".localized)
                 securityItem("Keys never leave your device".localized)
-                securityItem("kSecAttrAccessibleWhenUnlockedThisDeviceOnly".localized)
+                securityItem("Transactions require Face ID, with wallet password fallback".localized)
+                securityItem("Password fallback keys stay encrypted on this device".localized)
                 securityItem("P2P token held in memory only".localized)
                 securityItem("No analytics or tracking".localized)
             }
         }
         .glassCard()
+    }
+
+    private var walletPasswordSection: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            HStack(spacing: CRBTheme.Spacing.md) {
+                Image(systemName: WalletSecurityStore.shared.isPasswordEnabled ? "key.fill" : "key")
+                    .font(.system(size: 20))
+                    .foregroundColor(WalletSecurityStore.shared.isPasswordEnabled ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.warning)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Wallet Password".localized)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(CRBTheme.Colors.ink)
+                    Text(WalletSecurityStore.shared.isPasswordEnabled ? "Enabled as Face ID fallback".localized : "Set a password for Web3-style unlock fallback".localized)
+                        .font(.system(size: 12))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                }
+
+                Spacer()
+            }
+
+            SecureField("Password (min 8 characters)".localized, text: $walletPassword)
+                .textFieldStyle(.plain)
+                .foregroundColor(CRBTheme.Colors.ink)
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+
+            SecureField("Confirm Password".localized, text: $walletPasswordConfirm)
+                .textFieldStyle(.plain)
+                .foregroundColor(CRBTheme.Colors.ink)
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+
+            if let error = walletPasswordError {
+                Text(error.localized)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.error)
+            }
+
+            if let success = walletPasswordSuccess {
+                Text(success.localized)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.buyGreen)
+            }
+
+            HStack(spacing: CRBTheme.Spacing.md) {
+                GradientButton(
+                    title: isUpdatingWalletPassword ? "Saving...".localized : "Set Password".localized,
+                    icon: "key.fill",
+                    isDisabled: isUpdatingWalletPassword || walletPassword.isEmpty || walletPasswordConfirm.isEmpty
+                ) {
+                    setWalletPassword()
+                }
+
+                if WalletSecurityStore.shared.isPasswordEnabled {
+                    GradientButton(
+                        title: "Disable".localized,
+                        icon: "xmark.circle",
+                        isDisabled: isUpdatingWalletPassword,
+                        style: .secondary
+                    ) {
+                        disableWalletPassword()
+                    }
+                }
+            }
+
+            if WalletSecurityStore.shared.isPasswordEnabled {
+                Button {
+                    syncWalletPassword()
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text("Sync Password with Wallets".localized)
+                            .font(.system(size: 13, weight: .bold))
+                        Spacer()
+                    }
+                    .foregroundColor(CRBTheme.Colors.cyan)
+                    .padding(CRBTheme.Spacing.md)
+                    .background(CRBTheme.Colors.cyan.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                }
+                .disabled(isUpdatingWalletPassword || walletPassword.isEmpty)
+            }
+        }
     }
     
     private func securityItem(_ text: String) -> some View {
@@ -327,7 +449,70 @@ struct SettingsView: View {
                 .foregroundColor(CRBTheme.Colors.muted)
         }
     }
-    
+
+    private func setWalletPassword() {
+        walletPasswordError = nil
+        walletPasswordSuccess = nil
+        let password = walletPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        let confirm = walletPasswordConfirm.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard password == confirm else {
+            walletPasswordError = "Passwords do not match"
+            return
+        }
+
+        isUpdatingWalletPassword = true
+        Task {
+            do {
+                try await WalletSecurityStore.shared.setPassword(
+                    password,
+                    wallets: appState.wallets,
+                    usdtWallets: appState.linkedUSDTWallets
+                )
+                walletPassword = ""
+                walletPasswordConfirm = ""
+                walletPasswordSuccess = "Wallet password enabled"
+            } catch {
+                walletPasswordError = error.localizedDescription
+            }
+            isUpdatingWalletPassword = false
+        }
+    }
+
+    private func syncWalletPassword() {
+        walletPasswordError = nil
+        walletPasswordSuccess = nil
+        let password = walletPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !password.isEmpty else {
+            walletPasswordError = "Enter your wallet password to sync"
+            return
+        }
+
+        isUpdatingWalletPassword = true
+        Task {
+            do {
+                try await WalletSecurityStore.shared.syncFallbackKeys(
+                    wallets: appState.wallets,
+                    usdtWallets: appState.linkedUSDTWallets,
+                    password: password
+                )
+                walletPassword = ""
+                walletPasswordConfirm = ""
+                walletPasswordSuccess = "Wallet password synced"
+            } catch {
+                walletPasswordError = error.localizedDescription
+            }
+            isUpdatingWalletPassword = false
+        }
+    }
+
+    private func disableWalletPassword() {
+        WalletSecurityStore.shared.disablePassword(wallets: appState.wallets, usdtWallets: appState.linkedUSDTWallets)
+        walletPassword = ""
+        walletPasswordConfirm = ""
+        walletPasswordError = nil
+        walletPasswordSuccess = "Wallet password disabled"
+    }
+
     // MARK: - Currency & Region
     
     private var currencySection: some View {
@@ -410,6 +595,48 @@ struct SettingsView: View {
         }
         .glassCard()
     }
+
+    private var safeTradeAPISection: some View {
+        let settings = SafeTradeAPIService.shared.settings
+        return VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            SectionHeader(title: "SafeTrade API".localized, icon: "link.badge.plus")
+
+            Text("Connect SafeTrade API for USDT balances, transfer execution, and P2P payment actions.".localized)
+                .font(.system(size: 13))
+                .foregroundColor(CRBTheme.Colors.muted)
+
+            HStack {
+                Label(settings.isEnabled ? "Connected".localized : "Not Connected".localized, systemImage: settings.isEnabled ? "checkmark.circle.fill" : "xmark.circle")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(settings.isEnabled ? CRBTheme.Colors.success : CRBTheme.Colors.muted)
+                Spacer()
+                Text(settings.baseURL)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(CRBTheme.Colors.muted)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            NavigationLink {
+                SafeTradeAPISettingsView()
+            } label: {
+                HStack {
+                    Image(systemName: "key.fill")
+                    Text("Configure SafeTrade API".localized)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.cyan.opacity(0.08))
+                .foregroundColor(CRBTheme.Colors.cyan)
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            }
+        }
+        .glassCard()
+    }
     
     // MARK: - Support Developer
     
@@ -417,35 +644,39 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
             SectionHeader(title: "Support Developer".localized, icon: "heart.fill")
             
-            Text("If you find CRB Hub helpful, please consider supporting the developer by donating some CRB.".localized)
+            Text("If CRB Hub has been helpful, you can send a little CRB to invite the developer a coffee or banh mi while the next update is cooking.".localized)
                 .font(.system(size: 13))
                 .foregroundColor(CRBTheme.Colors.muted)
                 .multilineTextAlignment(.leading)
             
-            HStack(spacing: CRBTheme.Spacing.md) {
-                Text(AddressValidator.truncatedAddress(donationAddress))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundColor(CRBTheme.Colors.cyan)
-                
-                Spacer()
-                
-                Button {
-                    UIPasteboard.general.string = donationAddress
-                    withAnimation { copiedDonationAddress = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation { copiedDonationAddress = false }
+            VStack(spacing: CRBTheme.Spacing.md) {
+                HStack(spacing: CRBTheme.Spacing.sm) {
+                    Text(AddressValidator.truncatedAddress(donationAddress))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundColor(CRBTheme.Colors.cyan)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+
+                    Spacer()
+
+                    Button {
+                        UIPasteboard.general.string = donationAddress
+                        withAnimation { copiedDonationAddress = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation { copiedDonationAddress = false }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: copiedDonationAddress ? "checkmark" : "doc.on.doc")
+                            Text(copiedDonationAddress ? "Copied!".localized : "Copy".localized)
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(copiedDonationAddress ? CRBTheme.Colors.success : CRBTheme.Colors.cyan)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(copiedDonationAddress ? CRBTheme.Colors.success.opacity(0.1) : CRBTheme.Colors.cyan.opacity(0.1))
+                        .clipShape(Capsule())
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: copiedDonationAddress ? "checkmark" : "doc.on.doc")
-                        Text(copiedDonationAddress ? "Copied!".localized : "Copy".localized)
-                    }
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(copiedDonationAddress ? CRBTheme.Colors.success : CRBTheme.Colors.cyan)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(copiedDonationAddress ? CRBTheme.Colors.success.opacity(0.1) : CRBTheme.Colors.cyan.opacity(0.1))
-                    .clipShape(Capsule())
                 }
                 
                 NavigationLink {
@@ -455,10 +686,10 @@ struct SettingsView: View {
                         Image(systemName: "paperplane.fill")
                         Text("Send".localized)
                     }
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(Color(hex: 0x06121F))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                     .background(CRBTheme.Colors.cyan)
                     .clipShape(Capsule())
                 }
@@ -486,70 +717,89 @@ struct SettingsView: View {
             }
             .padding(.vertical, CRBTheme.Spacing.xs)
             
-            HStack {
+            HStack(spacing: CRBTheme.Spacing.sm) {
                 Text("App Version".localized)
                     .foregroundColor(CRBTheme.Colors.muted)
+                    .layoutPriority(1)
                 Spacer()
-                Text("1.0.0")
+                Text(appVersionText)
                     .foregroundColor(CRBTheme.Colors.ink)
+                    .lineLimit(1)
             }
             .font(.system(size: 13))
             
-            HStack {
+            HStack(spacing: CRBTheme.Spacing.sm) {
                 Text("Chain".localized)
                     .foregroundColor(CRBTheme.Colors.muted)
+                    .layoutPriority(1)
                 Spacer()
                 Text("Cereblix (CRB)")
                     .foregroundColor(CRBTheme.Colors.cyan)
+                    .lineLimit(1)
             }
             .font(.system(size: 13))
             
-            HStack {
+            HStack(spacing: CRBTheme.Spacing.sm) {
                 Text("Algorithm".localized)
                     .foregroundColor(CRBTheme.Colors.muted)
+                    .layoutPriority(1)
                 Spacer()
                 Text("NeuroMorph (CPU)")
                     .foregroundColor(CRBTheme.Colors.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .font(.system(size: 13))
             
-            HStack {
+            HStack(spacing: CRBTheme.Spacing.sm) {
                 Text("Base Unit".localized)
                     .foregroundColor(CRBTheme.Colors.muted)
+                    .layoutPriority(1)
                 Spacer()
                 Text("1 CRB = 100,000,000 synapses")
                     .foregroundColor(CRBTheme.Colors.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .font(.system(size: 13))
             
             Divider().background(CRBTheme.Colors.cardBorder)
             
-            HStack {
+            HStack(spacing: CRBTheme.Spacing.sm) {
                 Text("Developer".localized)
                     .foregroundColor(CRBTheme.Colors.muted)
+                    .layoutPriority(1)
                 Spacer()
                 Text("Hoang Tuan Nguyen")
                     .foregroundColor(CRBTheme.Colors.ink)
                     .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .font(.system(size: 13))
             
-            HStack {
+            HStack(spacing: CRBTheme.Spacing.sm) {
                 Text("Contact".localized)
                     .foregroundColor(CRBTheme.Colors.muted)
+                    .layoutPriority(1)
                 Spacer()
                 Text("nguyenminh044331@gmail.com")
                     .foregroundColor(CRBTheme.Colors.cyan)
                     .font(.system(size: 13, design: .monospaced))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .truncationMode(.tail)
             }
             .font(.system(size: 13))
             
-            HStack {
+            HStack(spacing: CRBTheme.Spacing.sm) {
                 Text("License".localized)
                     .foregroundColor(CRBTheme.Colors.muted)
+                    .layoutPriority(1)
                 Spacer()
                 Text("MIT License".localized)
                     .foregroundColor(CRBTheme.Colors.ink)
+                    .lineLimit(1)
             }
             .font(.system(size: 13))
             

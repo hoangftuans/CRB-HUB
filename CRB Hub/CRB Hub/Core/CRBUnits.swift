@@ -69,7 +69,8 @@ enum CRBUnits {
         }
     }
 
-    /// Format a Double USDT value
+    /// Format a Double USDT value. Prefer the Decimal overload for monetary values.
+    @available(*, unavailable, message: "Use Decimal for USDT monetary values.")
     static func formatUSDT(_ value: Double) -> String {
         formatUSDT(Decimal(value))
     }
@@ -78,7 +79,7 @@ enum CRBUnits {
     static func formatUSDT(_ value: Decimal) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 2
+        formatter.maximumFractionDigits = 8
         formatter.minimumFractionDigits = 2
         return "$\(formatter.string(from: value as NSDecimalNumber) ?? "0.00")"
     }

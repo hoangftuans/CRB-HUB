@@ -5,8 +5,8 @@ struct P2PTradeView: View {
     @State private var viewModel = P2PViewModel()
     @State private var chatInput = ""
     @State private var actionError: String?
-    @State private var showingUSDTTransferSuccess = false
-    @State private var usdtTransferTxHash = ""
+    @State private var usdtFallbackWalletId: UUID?
+    @State private var usdtFallbackPassword = ""
     
     let tradeId: String
     
@@ -19,7 +19,10 @@ struct P2PTradeView: View {
                     if let trade = viewModel.currentTrade {
                         // Trade header
                         tradeHeader(trade)
-                        
+
+                        // Live rate against locked trade price
+                        liveTradeRateCard(trade)
+
                         // State progress
                         stateProgress(trade)
                         
@@ -47,17 +50,21 @@ struct P2PTradeView: View {
         .task {
             if let token = appState.p2pToken {
                 await viewModel.loadTrade(token: token, tradeId: tradeId)
+                if let trade = viewModel.currentTrade {
+                    bindLoadedTradeWalletIfPossible(trade)
+                }
                 await viewModel.loadChat(token: token, tradeId: tradeId)
+                await refreshLiveRates(includeFiat: true)
                 viewModel.startChatRefresh(token: token, tradeId: tradeId)
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(10))
+                    guard !Task.isCancelled else { return }
+                    await refreshLiveRates(includeFiat: false)
+                }
             }
         }
         .onDisappear {
             viewModel.stopAutoRefresh()
-        }
-        .alert("Transfer Sent".localized, isPresented: $showingUSDTTransferSuccess) {
-            Button("OK".localized, role: .cancel) {}
-        } message: {
-            Text(String(format: "Your USDT transfer has been signed and broadcast.\nTx: %@".localized, usdtTransferTxHash))
         }
     }
     
@@ -66,15 +73,15 @@ struct P2PTradeView: View {
     private func tradeHeader(_ trade: P2PTrade) -> some View {
         let currency = appState.selectedFiatCurrency
         let rates = appState.cachedFXRates
-        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
+        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1
         let price = trade.Price ?? 0
-        let priceInFiat = price * Decimal(rate)
-        let amountInFiat = (trade.AmountUSDT ?? 0) * Decimal(rate)
+        let priceInFiat = price * rate
+        let amountInFiat = (trade.AmountUSDT ?? 0) * rate
         
         return VStack(spacing: CRBTheme.Spacing.md) {
             HStack {
                 PillBadge(text: trade.stateLabel.localized, color: stateColor(trade.State ?? ""))
-                PillBadge(text: trade.Side == "sell_crb" ? "Sell Offers".localized : "Buy Offers".localized,
+                PillBadge(text: (trade.Side == "sell_crb" ? "SELL" : "BUY").localized,
                         color: trade.Side == "sell_crb" ? CRBTheme.Colors.sellRed : CRBTheme.Colors.buyGreen)
                 PillBadge(text: trade.Rail?.capitalized ?? "—", color: CRBTheme.Colors.violet)
             }
@@ -95,6 +102,54 @@ struct P2PTradeView: View {
         }
         .frame(maxWidth: .infinity)
         .glassCard()
+    }
+
+    private func liveTradeRateCard(_ trade: P2PTrade) -> some View {
+        let currency = appState.selectedFiatCurrency
+        let tradePrice = trade.Price ?? 0
+        let marketPrice = liveMarketPrice ?? tradePrice
+        let fiatRate = selectedFiatRate
+        let marketFiat = marketPrice * fiatRate
+        let tradeFiat = tradePrice * fiatRate
+        let delta = marketPrice > 0 ? ((tradePrice - marketPrice) / marketPrice) * 100 : 0
+
+        return VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Live CRB/USDT".localized)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(CRBTheme.Colors.buyGreen)
+                    Text("\(CRBUnits.formatUSDT(marketPrice)) ≈ \(CurrencyManager.formatFiat(marketFiat, currencyCode: currency))")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(CRBTheme.Colors.ink)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("Locked Trade Price".localized)
+                        .font(.system(size: 11))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                    Text("\(CRBUnits.formatUSDT(tradePrice)) ≈ \(CurrencyManager.formatFiat(tradeFiat, currencyCode: currency))")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(CRBTheme.Colors.cyan)
+                }
+            }
+
+            HStack(spacing: CRBTheme.Spacing.md) {
+                ratePill("vs live".localized, NSDecimalNumber(decimal: delta).doubleValue)
+                ratePill("24h".localized, appState.p2pStats?.change_24h_pct ?? 0)
+                ratePill("7d".localized, appState.p2pStats?.change_7d_pct ?? 0)
+                Spacer()
+            }
+        }
+        .padding(CRBTheme.Spacing.md)
+        .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+        .overlay(
+            RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
+                .stroke(CRBTheme.Colors.buyGreen.opacity(0.2), lineWidth: 1)
+        )
     }
     
     // MARK: - State Progress
@@ -155,10 +210,10 @@ struct P2PTradeView: View {
     private func tradeDetails(_ trade: P2PTrade) -> some View {
         let currency = appState.selectedFiatCurrency
         let rates = appState.cachedFXRates
-        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1.0
+        let rate = rates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1
         let price = trade.Price ?? 0
-        let priceInFiat = price * Decimal(rate)
-        let amountInFiat = (trade.AmountUSDT ?? 0) * Decimal(rate)
+        let priceInFiat = price * rate
+        let amountInFiat = (trade.AmountUSDT ?? 0) * rate
         
         return VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
             SectionHeader(title: "Details".localized, icon: "doc.text")
@@ -370,9 +425,9 @@ struct P2PTradeView: View {
                     }
                     
                     if !myLocked {
-                        Text(isSeller ? 
+                        Text(isSeller ?
                              String(format: "Deposit %@ CRB to the escrow address below:".localized, amountStr) :
-                             String(format: "Deposit %@ USDT via %@ network to the escrow address below:".localized, amountStr, trade.Rail?.uppercased() ?? ""))
+                             String(format: "Deposit %@ via %@ network to the escrow address below:".localized, amountStr, railReceiveLabel(trade.Rail ?? "")))
                             .font(.system(size: 13))
                             .foregroundColor(CRBTheme.Colors.muted)
                             .lineSpacing(4)
@@ -413,19 +468,22 @@ struct P2PTradeView: View {
                              .background(CRBTheme.Colors.warning.opacity(0.05))
                              .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.xs))
                              
-                             if !isSeller {
-                                 let matchingWallets = appState.linkedUSDTWallets.filter { wallet in
-                                     wallet.network.rawValue.localizedCaseInsensitiveContains(trade.Rail ?? "") ||
-                                     wallet.network.displayName.localizedCaseInsensitiveContains(trade.Rail ?? "")
-                                 }
-                                 
-                                 if !matchingWallets.isEmpty {
-                                     VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
-                                         Text("Linked USDT Wallets Available:".localized)
-                                             .font(.system(size: 11, weight: .bold))
-                                             .foregroundColor(CRBTheme.Colors.cyan)
-                                             .padding(.bottom, 2)
-                                         
+	                             if !isSeller {
+	                                 let matchingWallets = matchingUSDTWallets(for: trade, role: isMaker ? .maker : .taker)
+
+	                                 if !matchingWallets.isEmpty {
+	                                     VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+	                                         HStack {
+	                                             Text("Pay from existing USDT wallet".localized)
+	                                                 .font(.system(size: 11, weight: .bold))
+	                                                 .foregroundColor(CRBTheme.Colors.cyan)
+	                                             Spacer()
+	                                             if boundUSDTWallet(for: trade, role: isMaker ? .maker : .taker) != nil {
+	                                                 PillBadge(text: "Bound".localized, color: CRBTheme.Colors.buyGreen)
+	                                             }
+	                                         }
+	                                         .padding(.bottom, 2)
+
                                          ForEach(matchingWallets) { wallet in
                                              VStack(spacing: 8) {
                                                  HStack {
@@ -436,44 +494,72 @@ struct P2PTradeView: View {
                                                          .font(.system(size: 13, weight: .semibold))
                                                          .foregroundColor(CRBTheme.Colors.ink)
                                                      Spacer()
-                                                     Text(String(format: "%.2f USDT", (wallet.balance as NSDecimalNumber).doubleValue))
+                                                     Text("\(CRBUnits.formatDecimal(wallet.balance, maxFractionDigits: 6, minFractionDigits: 2)) USDT")
                                                          .font(.system(size: 13, weight: .bold, design: .monospaced))
                                                          .foregroundColor(CRBTheme.Colors.cyan)
                                                  }
                                                  .padding(8)
                                                  .background(CRBTheme.Colors.backgroundSecondary.opacity(0.4))
                                                  .clipShape(RoundedRectangle(cornerRadius: 6))
-                                                 
+
                                                  if wallet.isNative {
+                                                     VStack(alignment: .leading, spacing: 6) {
+                                                         Button {
+                                                             payNativeUSDTEscrow(wallet: wallet, escrowAddr: escrowAddr, amount: amountStr)
+                                                         } label: {
+                                                             HStack {
+                                                                 Image(systemName: "faceid")
+                                                                 Text("Pay Escrow with Face ID".localized)
+                                                                     .font(.system(size: 12, weight: .bold))
+                                                             }
+                                                             .frame(maxWidth: .infinity)
+                                                             .padding(8)
+                                                             .background(CRBTheme.Colors.cyan.opacity(0.14))
+                                                             .foregroundColor(CRBTheme.Colors.cyan)
+                                                             .clipShape(RoundedRectangle(cornerRadius: 6))
+                                                         }
+
+                                                         if usdtFallbackWalletId == wallet.id {
+                                                             SecureField("Wallet Password".localized, text: $usdtFallbackPassword)
+                                                                 .textFieldStyle(.plain)
+                                                                 .font(.system(size: 12))
+                                                                 .foregroundColor(CRBTheme.Colors.ink)
+                                                                 .padding(8)
+                                                                 .background(CRBTheme.Colors.backgroundSecondary.opacity(0.6))
+                                                                 .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                                                             Button {
+                                                                 payNativeUSDTEscrow(wallet: wallet, escrowAddr: escrowAddr, amount: amountStr, fallbackPassword: usdtFallbackPassword)
+                                                             } label: {
+                                                                 Text("Unlock with Password".localized)
+                                                                     .font(.system(size: 12, weight: .bold))
+                                                                     .frame(maxWidth: .infinity)
+                                                                     .padding(8)
+                                                                     .background(CRBTheme.Colors.violet.opacity(0.14))
+                                                                     .foregroundColor(CRBTheme.Colors.violet)
+                                                                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                                                             }
+                                                             .disabled(usdtFallbackPassword.isEmpty)
+                                                         }
+                                                     }
+                                                     .frame(maxWidth: .infinity, alignment: .leading)
+                                                     .padding(8)
+                                                     .background(CRBTheme.Colors.cyan.opacity(0.06))
+                                                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                                                 } else {
                                                      Button {
-                                                         simulateNativeUSDTTransfer(wallet: wallet, escrowAddr: escrowAddr, amount: trade.AmountUSDT ?? 0)
+                                                         copyEscrowPayment(address: escrowAddr, amount: amountStr, asset: assetName)
                                                      } label: {
                                                          HStack {
-                                                             Image(systemName: "creditcard.fill")
-                                                             Text(String(format: "Pay via %@".localized, wallet.name))
+                                                             Image(systemName: "doc.on.doc")
+                                                             Text(String(format: "Copy payment for %@".localized, wallet.name))
                                                                  .font(.system(size: 12, weight: .bold))
                                                          }
                                                          .frame(maxWidth: .infinity)
                                                          .padding(8)
-                                                         .background(CRBTheme.Colors.cyan)
-                                                         .foregroundColor(Color(hex: 0x06121F))
+                                                         .background(CRBTheme.Colors.violet.opacity(0.12))
+                                                         .foregroundColor(CRBTheme.Colors.violet)
                                                          .clipShape(RoundedRectangle(cornerRadius: 6))
-                                                     }
-                                                 } else {
-                                                     HStack {
-                                                         Spacer()
-                                                         Button {
-                                                             UIPasteboard.general.string = escrowAddr
-                                                             // Trigger custom open URL if desired
-                                                         } label: {
-                                                             Text(String(format: "Withdraw from %@".localized, wallet.provider.rawValue))
-                                                                 .font(.system(size: 11, weight: .bold))
-                                                                 .foregroundColor(CRBTheme.Colors.violet)
-                                                                 .padding(.horizontal, 8)
-                                                                 .padding(.vertical, 4)
-                                                                 .background(CRBTheme.Colors.violet.opacity(0.1))
-                                                                 .clipShape(Capsule())
-                                                         }
                                                      }
                                                  }
                                              }
@@ -484,10 +570,32 @@ struct P2PTradeView: View {
                                      .background(CRBTheme.Colors.backgroundSecondary.opacity(0.2))
                                      .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
                                      .padding(.vertical, 4)
+	                                 } else {
+	                                     Text(String(format: "No linked %@ wallet matches this trade. Add one in Settings before paying or copy the escrow address to an external wallet on the same network.".localized, railReceiveLabel(trade.Rail ?? "")))
+                                         .font(.system(size: 12))
+                                         .foregroundColor(CRBTheme.Colors.warning)
+                                         .padding(CRBTheme.Spacing.sm)
+                                         .background(CRBTheme.Colors.warning.opacity(0.06))
+                                         .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
                                  }
                              }
-                             
+
                              if isSeller {
+                                if let wallet = appState.selectedWallet {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Pay from active CRB wallet".localized)
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(CRBTheme.Colors.cyan)
+                                        Text("\(wallet.name) • \(AddressValidator.truncatedAddress(wallet.address))")
+                                            .font(.system(size: 12, design: .monospaced))
+                                            .foregroundColor(CRBTheme.Colors.muted)
+                                    }
+                                    .padding(CRBTheme.Spacing.sm)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(CRBTheme.Colors.backgroundSecondary.opacity(0.2))
+                                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                                }
+
                                 // Direct Pay Escrow button opening SendView prefilled
                                 NavigationLink {
                                     SendView(prefilledAddress: escrowAddr, prefilledAmount: amountStr)
@@ -563,20 +671,123 @@ struct P2PTradeView: View {
         }
     }
     
-    private func simulateNativeUSDTTransfer(wallet: USDTWallet, escrowAddr: String, amount: Decimal) {
-        var txBytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, txBytes.count, &txBytes)
-        usdtTransferTxHash = "0x" + txBytes.map { String(format: "%02x", $0) }.joined()
-        
-        withAnimation {
-            showingUSDTTransferSuccess = true
+    private func matchingUSDTWallets(for trade: P2PTrade, role: P2PWalletBinding.Role) -> [USDTWallet] {
+        let rail = trade.Rail ?? ""
+        let railWallets = appState.linkedUSDTWallets.filter { $0.network.p2pRail == rail.lowercased() }
+        guard let boundWallet = boundUSDTWallet(for: trade, role: role) else {
+            return railWallets
         }
-        
+        return [boundWallet] + railWallets.filter { $0.id != boundWallet.id }
+    }
+
+    private func boundUSDTWallet(for trade: P2PTrade, role: P2PWalletBinding.Role) -> USDTWallet? {
+        guard let tradeId = trade.ID else { return nil }
+        if let boundWallet = appState.p2pBoundUSDTWallet(kind: .trade, p2pId: tradeId, role: role) {
+            return boundWallet
+        }
+        guard let usdtAddress = role == .maker ? trade.MakerUSDT : trade.TakerUSDT else {
+            return nil
+        }
+        return appState.linkedUSDTWallets.first {
+            $0.address.caseInsensitiveCompare(usdtAddress) == .orderedSame &&
+            $0.network.p2pRail == trade.Rail?.lowercased()
+        }
+    }
+
+    private func bindLoadedTradeWalletIfPossible(_ trade: P2PTrade) {
+        guard let tradeId = trade.ID else { return }
+        let isMaker = trade.MakerAddr == appState.selectedWallet?.address
+        let isTaker = trade.TakerAddr == appState.selectedWallet?.address
+        guard isMaker || isTaker else { return }
+
+        let role: P2PWalletBinding.Role = isMaker ? .maker : .taker
+        guard appState.p2pBinding(kind: .trade, p2pId: tradeId, role: role) == nil else {
+            return
+        }
+        guard let usdtAddress = isMaker ? trade.MakerUSDT : trade.TakerUSDT,
+              let wallet = appState.linkedUSDTWallets.first(where: {
+                  $0.address.caseInsensitiveCompare(usdtAddress) == .orderedSame &&
+                  $0.network.p2pRail == trade.Rail?.lowercased()
+              }) else {
+            return
+        }
+
+        appState.bindP2PWallet(
+            kind: .trade,
+            p2pId: tradeId,
+            role: role,
+            usdtAddress: wallet.address,
+            usdtNetwork: wallet.network,
+            usdtWalletId: wallet.id
+        )
+    }
+
+    private var liveMarketPrice: Decimal? {
+        if let price = appState.p2pStats?.price_usdt, price > 0 {
+            return price
+        }
+        if appState.cachedCRBPriceUSDT > 0 {
+            return appState.cachedCRBPriceUSDT
+        }
+        return nil
+    }
+
+    private var selectedFiatRate: Decimal {
+        let currency = appState.selectedFiatCurrency
+        return appState.cachedFXRates[currency] ?? CurrencyManager.fallbackRates[currency] ?? 1
+    }
+
+    private func ratePill(_ label: String, _ value: Double) -> some View {
+        let positive = value >= 0
+        return Text("\(label) \(positive ? "+" : "")\(String(format: "%.2f", value))%")
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .foregroundColor(positive ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.sellRed)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background((positive ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.sellRed).opacity(0.08))
+            .clipShape(Capsule())
+    }
+
+    private func refreshLiveRates(includeFiat: Bool) async {
+        await appState.refreshP2PStats()
+        if includeFiat {
+            await appState.refreshFiatRates()
+        }
+    }
+
+    private func railReceiveLabel(_ rail: String) -> String {
+        rail.lowercased() == "solana" ? "Solana USDT" : "Polygon USDT"
+    }
+
+    private func payNativeUSDTEscrow(wallet: USDTWallet, escrowAddr: String, amount: String, fallbackPassword: String? = nil) {
+        guard let amountDecimal = Decimal(string: amount), amountDecimal > 0 else {
+            actionError = "Invalid USDT amount"
+            return
+        }
+
+        actionError = nil
         Task {
-            if let token = appState.p2pToken, let id = viewModel.currentTrade?.ID {
-                try? await viewModel.tradeReady(token: token, tradeId: id)
+            do {
+                _ = try await USDTTransferService.sendSecure(
+                    wallet: wallet,
+                    to: escrowAddr,
+                    amount: amountDecimal,
+                    fallbackPassword: fallbackPassword
+                )
+                usdtFallbackWalletId = nil
+                usdtFallbackPassword = ""
+            } catch WalletSecurityStore.SecurityError.passwordRequired {
+                usdtFallbackWalletId = wallet.id
+                usdtFallbackPassword = ""
+                actionError = "Face ID failed. Please enter your wallet password."
+            } catch {
+                actionError = error.localizedDescription
             }
         }
+    }
+
+    private func copyEscrowPayment(address: String, amount: String, asset: String) {
+        UIPasteboard.general.string = "\(asset) \(amount)\n\(address)"
     }
 }
 

@@ -15,7 +15,12 @@ struct USDTBalanceService {
     /// Fetches the live USDT balance of an address on the specified network.
     static func fetchBalance(for address: String, network: USDTNetwork) async throws -> Decimal {
         let cleanedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanedAddress.isEmpty else { return 0.0 }
+        guard !cleanedAddress.isEmpty else { return 0 }
+
+        if SafeTradeAPIService.shared.isEnabled,
+           let safeTradeBalance = try? await SafeTradeAPIService.shared.fetchUSDTBalance(address: cleanedAddress, network: network) {
+            return safeTradeBalance
+        }
 
         switch network {
         case .erc20:
@@ -26,6 +31,8 @@ struct USDTBalanceService {
             return try await fetchEVMBalance(rpcURL: polygonRPC, tokenContract: polygonUSDTContract, userAddress: cleanedAddress, decimals: 6)
         case .trc20:
             return try await fetchTronBalance(userAddress: cleanedAddress)
+        case .solana:
+            return 0
         }
     }
 
@@ -80,13 +87,11 @@ struct USDTBalanceService {
             hexAmount = String(hexAmount.dropFirst(2))
         }
 
-        // Convert to double/decimal
-        guard let rawVal = parseHex(hexAmount) else {
+        guard let rawAmount = parseHexToDecimal(hexAmount) else {
             throw NSError(domain: "USDTBalanceService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to parse balance hex value"])
         }
 
-        let divisor = pow(10, decimals)
-        return Decimal(rawVal) / divisor
+        return rawAmount / decimalPowerOf10(decimals)
     }
 
     // MARK: - Tron Fetcher
@@ -118,25 +123,48 @@ struct USDTBalanceService {
                 // TRC-20 USDT Contract is TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
                 if let usdtToken = dataArray.first(where: { ($0["tokenId"] as? String) == "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" }) {
                     if let balanceStr = usdtToken["balance"] as? String,
-                       let balanceVal = Double(balanceStr) {
+                       let balanceVal = Decimal(string: balanceStr) {
                         // Tron USDT has 6 decimals
-                        return Decimal(balanceVal) / 1_000_000
+                        return balanceVal / decimalPowerOf10(6)
                     }
                 }
             }
         } catch {
             // Fallback to simulation if Tronscan API is rate-limited
-            return 0.0
+            return 0
         }
 
-        return 0.0
+        return 0
     }
 
     // MARK: - Parsing Helpers
 
-    private static func parseHex(_ hex: String) -> UInt64? {
-        // Take the suffix representing 64-bit value to avoid overflow
-        let safeHex = String(hex.suffix(16))
-        return UInt64(safeHex, radix: 16)
+    private static func parseHexToDecimal(_ hex: String) -> Decimal? {
+        guard !hex.isEmpty else { return 0 }
+
+        var result: Decimal = 0
+        for scalar in hex.unicodeScalars {
+            guard let digit = hexDigitValue(scalar) else { return nil }
+            result = (result * 16) + Decimal(digit)
+        }
+        return result
+    }
+
+    private static func hexDigitValue(_ scalar: Unicode.Scalar) -> Int? {
+        switch scalar.value {
+        case 48...57:
+            return Int(scalar.value - 48)
+        case 65...70:
+            return Int(scalar.value - 55)
+        case 97...102:
+            return Int(scalar.value - 87)
+        default:
+            return nil
+        }
+    }
+
+    private static func decimalPowerOf10(_ exponent: Int) -> Decimal {
+        guard exponent > 0 else { return 1 }
+        return (0..<exponent).reduce(Decimal(1)) { value, _ in value * 10 }
     }
 }

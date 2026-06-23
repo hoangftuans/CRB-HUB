@@ -96,6 +96,50 @@ final class WalletViewModel {
             group.addTask { await self.loadHistory(address: address, refresh: true) }
         }
     }
+
+    func sendCRBSecure(
+        wallet: WalletAccount,
+        to recipient: String,
+        amount: UInt64,
+        fee: UInt64,
+        fallbackPassword: String? = nil
+    ) async {
+        guard !isSending else { return }
+        isSending = true
+        sendError = nil
+        sendResult = nil
+        defer { isSending = false }
+
+        do {
+            let currentBalance = try await CereblixAPIClient.getBalance(address: wallet.address)
+            let currentStatus = try await CereblixAPIClient.getStatus()
+            let amountDescription = "\(CRBUnits.formatCRB(amount, maxFractionDigits: 8, minFractionDigits: 0)) CRB"
+            let privateKeyHex = try await WalletSecurityStore.shared.loadPrivateKeyForTransaction(
+                walletId: wallet.id,
+                amountDescription: amountDescription,
+                fallbackPassword: fallbackPassword
+            )
+
+            guard let signedTransaction = try WalletCore.signTransaction(
+                from: wallet.address,
+                to: recipient,
+                amount: amount,
+                fee: fee,
+                nonce: currentBalance.nonce,
+                chainId: currentStatus.chain_id,
+                signingHeight: UInt64(currentStatus.height + 1),
+                privateKeyHex: privateKeyHex,
+                publicKeyHex: wallet.publicKeyHex
+            ) else {
+                throw WalletCore.WalletError.signingFailed
+            }
+
+            sendResult = try await CereblixAPIClient.broadcastTransaction(signedTransaction)
+            await loadAll(address: wallet.address)
+        } catch {
+            sendError = error.localizedDescription
+        }
+    }
     
     func startAutoRefresh(address: String) {
         stopAutoRefresh()
