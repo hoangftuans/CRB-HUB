@@ -12,7 +12,7 @@ struct SettingsView: View {
     @State private var copiedDonationAddress = false
     
     // Developer Donation Wallet Address (Change this to your real CRB address)
-    private let donationAddress = "crb1555555555555555555555555555555555555555"
+    private let donationAddress = "crb1bcf10b1d12f028f8a3583010c1be8f228360727b"
     
     var body: some View {
         NavigationStack {
