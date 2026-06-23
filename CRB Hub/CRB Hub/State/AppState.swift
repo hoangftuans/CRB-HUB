@@ -1,5 +1,64 @@
 import SwiftUI
 
+// MARK: - Node URL Validator
+
+/// Validates custom node URLs for security.
+/// Only HTTPS is allowed (except localhost/127.0.0.1 for local dev).
+/// Warns if the domain is not cereblix.com.
+enum NodeURLValidator {
+    
+    enum ValidationResult {
+        case valid
+        case validWithWarning(String)
+        case invalid(String)
+    }
+    
+    /// Official domains that don't trigger a warning
+    private static let officialDomains = ["cereblix.com", "www.cereblix.com"]
+    
+    /// Validate a node URL string
+    static func validate(_ urlString: String) -> ValidationResult {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmed.isEmpty else {
+            return .invalid("URL cannot be empty")
+        }
+        
+        guard let components = URLComponents(string: trimmed) else {
+            return .invalid("Invalid URL format")
+        }
+        
+        guard let scheme = components.scheme?.lowercased() else {
+            return .invalid("URL must include a scheme (https://)")
+        }
+        
+        guard let host = components.host, !host.isEmpty else {
+            return .invalid("URL must include a valid host")
+        }
+        
+        // Allow http only for localhost / 127.0.0.1
+        let isLocalhost = host == "localhost" || host == "127.0.0.1"
+        
+        if scheme == "http" && !isLocalhost {
+            return .invalid("Only HTTPS connections are allowed. HTTP is insecure and can expose your wallet data.")
+        }
+        
+        if scheme != "https" && scheme != "http" {
+            return .invalid("URL scheme must be https")
+        }
+        
+        // Warn about non-official domains
+        let isOfficial = officialDomains.contains(host.lowercased()) ||
+                          host.lowercased().hasSuffix(".cereblix.com")
+        
+        if !isOfficial && !isLocalhost {
+            return .validWithWarning("⚠️ This is not an official Cereblix node. Only use nodes you trust. Your API requests (including auth tokens) will be sent to this server.")
+        }
+        
+        return .valid
+    }
+}
+
 /// Global app state — selected wallet, onboarding, node config, currency preferences
 @Observable
 @MainActor
@@ -17,6 +76,12 @@ final class AppState {
             UserDefaults.standard.set(nodeBaseURL, forKey: "node_base_url")
         }
     }
+    
+    /// Validation error for nodeBaseURL, shown in UI
+    var nodeURLError: String?
+    
+    /// Warning for non-official node, shown in UI
+    var nodeURLWarning: String?
     
     // MARK: - P2P Session (memory only — never persisted)
     var p2pToken: String?

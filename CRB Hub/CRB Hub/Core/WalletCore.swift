@@ -48,8 +48,8 @@ enum WalletCore {
     
     // MARK: - Signing
     
-    /// Sign arbitrary message bytes with the private key
-    /// Used for P2P login challenge
+    /// Sign arbitrary message bytes with the private key.
+    /// ⚠️ Internal use only — external callers should use domain-specific wrappers.
     static func signMessage(_ message: Data, privateKeyHex: String) throws -> String {
         guard let keyData = Data(hexString: privateKeyHex), keyData.count == 32 else {
             throw WalletError.invalidPrivateKey
@@ -61,9 +61,37 @@ enum WalletCore {
     }
     
     /// Sign a message string (UTF-8 encoded)
+    /// ⚠️ Internal use only — external callers should use domain-specific wrappers.
     static func signMessageString(_ message: String, privateKeyHex: String) throws -> String {
         let messageData = Data(message.utf8)
         return try signMessage(messageData, privateKeyHex: privateKeyHex)
+    }
+    
+    // MARK: - Domain-Separated P2P Login Signing
+    
+    /// The fixed prefix for P2P login challenges.
+    /// This prevents a malicious server from tricking the client into
+    /// signing a transaction payload disguised as a login challenge.
+    private static let p2pLoginPrefix = "cereblix-otc-login:v1:"
+    
+    /// Validate a P2P nonce from the server.
+    /// Must be non-empty, alphanumeric (+ hyphen/underscore), 8-128 characters.
+    static func validateP2PNonce(_ nonce: String) -> Bool {
+        let pattern = "^[a-zA-Z0-9_-]{8,128}$"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return false }
+        let range = NSRange(nonce.startIndex..., in: nonce)
+        return regex.firstMatch(in: nonce, range: range) != nil
+    }
+    
+    /// Sign a P2P login challenge using domain separation.
+    /// Constructs: "cereblix-otc-login:v1:<nonce>" and signs that.
+    /// The server's `challenge.msg` is IGNORED — only the nonce is used.
+    static func signP2PLogin(nonce: String, privateKeyHex: String) throws -> String {
+        guard validateP2PNonce(nonce) else {
+            throw WalletError.invalidNonce
+        }
+        let message = p2pLoginPrefix + nonce
+        return try signMessageString(message, privateKeyHex: privateKeyHex)
     }
     
     // MARK: - Transaction Signing
@@ -90,6 +118,7 @@ enum WalletCore {
         case invalidPublicKey
         case signingFailed
         case signingNotImplemented
+        case invalidNonce
         
         var errorDescription: String? {
             switch self {
@@ -101,6 +130,8 @@ enum WalletCore {
                 return "Failed to sign the message."
             case .signingNotImplemented:
                 return "Transaction signing is not yet implemented. The canonical byte format from the Cereblix reference wallet is required."
+            case .invalidNonce:
+                return "Invalid P2P login nonce. The server returned a malformed challenge."
             }
         }
     }

@@ -192,8 +192,38 @@ struct SettingsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
                     .overlay(
                         RoundedRectangle(cornerRadius: CRBTheme.Radius.md)
-                            .stroke(CRBTheme.Colors.cardBorder, lineWidth: 1)
+                            .stroke(
+                                appState.nodeURLError != nil ? CRBTheme.Colors.error.opacity(0.5) :
+                                    (appState.nodeURLWarning != nil ? CRBTheme.Colors.warning.opacity(0.5) : CRBTheme.Colors.cardBorder),
+                                lineWidth: 1
+                            )
                     )
+                
+                // Inline validation error
+                if let error = appState.nodeURLError {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                        Text(error)
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(CRBTheme.Colors.error)
+                }
+                
+                // Security warning for non-official nodes
+                if let warning = appState.nodeURLWarning {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(CRBTheme.Colors.warning)
+                        Text(warning)
+                            .font(.system(size: 11))
+                            .foregroundColor(CRBTheme.Colors.warning.opacity(0.9))
+                    }
+                    .padding(CRBTheme.Spacing.sm)
+                    .background(CRBTheme.Colors.warning.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                }
             }
             
             HStack(spacing: CRBTheme.Spacing.md) {
@@ -202,22 +232,42 @@ struct SettingsView: View {
                     icon: savedNodeURL ? "checkmark" : "square.and.arrow.down"
                 ) {
                     let url = nodeURLInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !url.isEmpty {
+                    
+                    // Validate URL before saving
+                    let result = NodeURLValidator.validate(url)
+                    switch result {
+                    case .valid:
+                        appState.nodeURLError = nil
+                        appState.nodeURLWarning = nil
                         appState.nodeBaseURL = url
                         withAnimation { savedNodeURL = true }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                             withAnimation { savedNodeURL = false }
                         }
+                    case .validWithWarning(let warning):
+                        appState.nodeURLError = nil
+                        appState.nodeURLWarning = warning
+                        appState.nodeBaseURL = url
+                        withAnimation { savedNodeURL = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation { savedNodeURL = false }
+                        }
+                    case .invalid(let error):
+                        appState.nodeURLError = error
+                        appState.nodeURLWarning = nil
+                        // Do NOT save invalid URLs
                     }
                 }
                 
                 GradientButton(title: "Reset".localized, style: .secondary) {
                     nodeURLInput = "https://cereblix.com"
                     appState.nodeBaseURL = "https://cereblix.com"
+                    appState.nodeURLError = nil
+                    appState.nodeURLWarning = nil
                 }
             }
             
-            Text("Default: https://cereblix.com\nYou can run your own node at http://NODE_IP:18751")
+            Text("Default: https://cereblix.com\nCustom nodes must use HTTPS for security.")
                 .font(.system(size: 11))
                 .foregroundColor(CRBTheme.Colors.muted.opacity(0.7))
         }
@@ -574,10 +624,13 @@ struct SettingsView: View {
         
         Task {
             do {
-                let key = try await KeychainStore.shared.loadPrivateKeyWithBiometrics(for: walletId)
+                let key = try await KeychainStore.shared.loadPrivateKeySecure(
+                    for: walletId,
+                    reason: "Authenticate to export your private key"
+                )
                 exportedKey = key
             } catch {
-                // Biometrics failed
+                // Biometrics failed or key not found
             }
         }
     }

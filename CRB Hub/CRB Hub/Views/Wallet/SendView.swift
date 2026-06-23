@@ -77,19 +77,19 @@ struct SendView: View {
     
     private var sendForm: some View {
         VStack(spacing: CRBTheme.Spacing.xl) {
-            // Signing not ready warning
+            // 🔒 Security audit notice — Send is frozen
             VStack(spacing: CRBTheme.Spacing.md) {
                 HStack(spacing: CRBTheme.Spacing.md) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 20))
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 24))
                         .foregroundColor(CRBTheme.Colors.warning)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Transaction Signing".localized)
+                        Text("Security Audit in Progress".localized)
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(CRBTheme.Colors.warning)
                         
-                        Text("Send functionality requires the canonical transaction byte format from the Cereblix reference wallet. This feature is currently under development.".localized)
+                        Text("Transaction signing is disabled pending security audit. Your funds are safe — no transactions can be sent until the signing module is fully verified.".localized)
                             .font(.system(size: 12))
                             .foregroundColor(CRBTheme.Colors.muted)
                     }

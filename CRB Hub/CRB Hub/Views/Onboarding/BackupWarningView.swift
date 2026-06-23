@@ -90,7 +90,7 @@ struct BackupWarningView: View {
                                 )
                             
                             Button {
-                                UIPasteboard.general.string = privateKeyHex
+                                SecurePasteboard.copyWithExpiry(privateKeyHex)
                                 withAnimation { copiedKey = true }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                     withAnimation { copiedKey = false }

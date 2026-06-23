@@ -67,21 +67,31 @@ final class P2PViewModel {
         loginError = nil
         
         do {
-            // Step 1: Get challenge
+            // Step 1: Get challenge from server
             let challenge = try await P2PAPIClient.getChallenge()
             
-            // Step 2: Sign the message with wallet private key
-            let privateKeyHex = try KeychainStore.shared.loadPrivateKey(for: wallet.id)
-            let signature = try WalletCore.signMessageString(challenge.msg, privateKeyHex: privateKeyHex)
+            // Step 2: Load private key with biometric authentication (Keychain-enforced)
+            let privateKeyHex = try await KeychainStore.shared.loadPrivateKeySecure(
+                for: wallet.id,
+                reason: "Authenticate to sign P2P login challenge"
+            )
             
-            // Step 3: Login with pub, nonce, sig
+            // Step 3: Sign using domain-separated message (NOT challenge.msg)
+            // Client constructs: "cereblix-otc-login:v1:<nonce>"
+            // This prevents the server from tricking us into signing a transaction
+            let signature = try WalletCore.signP2PLogin(
+                nonce: challenge.nonce,
+                privateKeyHex: privateKeyHex
+            )
+            
+            // Step 4: Login with pub, nonce, sig
             let session = try await P2PAPIClient.login(
                 pub: wallet.publicKeyHex,
                 nonce: challenge.nonce,
                 sig: signature
             )
             
-            // Step 4: Store token in memory
+            // Step 5: Store token in memory only (never persisted)
             appState.setP2PSession(token: session.token, address: session.addr ?? wallet.address)
             
         } catch {

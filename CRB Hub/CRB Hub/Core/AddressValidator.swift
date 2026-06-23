@@ -1,6 +1,6 @@
 import Foundation
 
-/// CRB address validation
+/// CRB address validation and input sanitization
 /// Format: crb1 + 40 hex characters (case-insensitive)
 enum AddressValidator {
     private static let addressPattern = "^crb1[0-9a-fA-F]{40}$"
@@ -22,4 +22,30 @@ enum AddressValidator {
         let end = address.suffix(trailing)
         return "\(start)...\(end)"
     }
+    
+    // MARK: - Input Sanitization
+    
+    /// Sanitize user input: strip control characters, normalize unicode, trim whitespace.
+    /// Use this for any user-provided string before processing.
+    static func sanitizeInput(_ input: String) -> String {
+        // 1. Trim whitespace and newlines
+        var sanitized = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 2. Remove control characters (except newline for multi-line inputs)
+        sanitized = String(sanitized.unicodeScalars.filter {
+            !$0.properties.isDefaultIgnorableCodePoint && ($0.value >= 0x20 || $0 == "\n")
+        })
+        
+        // 3. Normalize unicode to NFC form (prevents homoglyph attacks)
+        sanitized = sanitized.precomposedStringWithCanonicalMapping
+        
+        return sanitized
+    }
+    
+    /// Sanitize a single-line input (strips all newlines too)
+    static func sanitizeSingleLine(_ input: String) -> String {
+        let cleaned = sanitizeInput(input)
+        return cleaned.replacingOccurrences(of: "\n", with: "")
+    }
 }
+

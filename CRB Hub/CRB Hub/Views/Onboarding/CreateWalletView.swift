@@ -174,7 +174,7 @@ struct CreateWalletView: View {
                 if showPrivateKey {
                     Button {
                         if let key = privateKeyHex {
-                            UIPasteboard.general.string = key
+                            SecurePasteboard.copyWithExpiry(key)
                             copiedKey = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                 copiedKey = false

@@ -402,7 +402,7 @@ struct GenerateNativeUSDTSheet: View {
                                             .truncationMode(.middle)
                                         Spacer()
                                         Button {
-                                            UIPasteboard.general.string = wallet.privateKey
+                                            SecurePasteboard.copyWithExpiry(wallet.privateKey)
                                             withAnimation { copiedKey = true }
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                                 copiedKey = false

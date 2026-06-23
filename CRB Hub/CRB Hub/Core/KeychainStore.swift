@@ -3,8 +3,9 @@ import Security
 import LocalAuthentication
 
 /// Keychain storage for CRB wallet private keys.
-/// Keys are stored with kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-/// and never leave the device.
+/// Keys are protected with SecAccessControl requiring biometry (.biometryCurrentSet)
+/// and kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly.
+/// Private keys NEVER leave the device.
 @MainActor
 final class KeychainStore {
     
@@ -12,6 +13,8 @@ final class KeychainStore {
     
     private let service = "com.crbhub.wallet"
     private let accountListKey = "wallet_accounts"
+    /// Legacy service tag used before the biometric migration
+    private let legacyService = "com.crbhub.wallet"
     
     private init() {}
     
@@ -47,27 +50,44 @@ final class KeychainStore {
         }
     }
     
-    // MARK: - Private Key Storage (Keychain)
+    // MARK: - Biometric Access Control
     
-    /// Save private key to Keychain
+    /// Create SecAccessControl flags requiring biometry + passcode.
+    /// .biometryCurrentSet means re-enrollment invalidates the key.
+    private func createAccessControl() throws -> SecAccessControl {
+        var error: Unmanaged<CFError>?
+        guard let access = SecAccessControlCreateWithFlags(
+            kCFAllocatorDefault,
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            .biometryCurrentSet,
+            &error
+        ) else {
+            throw KeychainError.accessControlCreationFailed
+        }
+        return access
+    }
+    
+    // MARK: - Private Key Storage (Keychain with Biometric Protection)
+    
+    /// Save private key to Keychain with biometric protection.
+    /// The key is protected by SecAccessControl with .biometryCurrentSet,
+    /// meaning Face ID / Touch ID is required to read it.
     func savePrivateKey(_ privateKeyHex: String, for walletId: UUID) throws {
         let keyData = Data(privateKeyHex.utf8)
         
-        // Delete any existing key first
-        let deleteQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: walletId.uuidString,
-        ]
-        SecItemDelete(deleteQuery as CFDictionary)
+        // Delete any existing key first (both legacy and new)
+        deletePrivateKeyRaw(for: walletId)
         
-        // Add new key
+        // Create biometric access control
+        let accessControl = try createAccessControl()
+        
+        // Add new key with biometric protection
         let addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: walletId.uuidString,
             kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrAccessControl as String: accessControl,
         ]
         
         let status = SecItemAdd(addQuery as CFDictionary, nil)
@@ -77,57 +97,101 @@ final class KeychainStore {
         }
     }
     
-    /// Load private key from Keychain (requires biometric auth in production)
-    func loadPrivateKey(for walletId: UUID) throws -> String {
+    /// Load private key from Keychain with biometric authentication enforced at the Keychain level.
+    /// There is NO unprotected path to read a private key — Face ID is enforced by SecAccessControl.
+    func loadPrivateKeySecure(for walletId: UUID, reason: String = "Authenticate to access your wallet") async throws -> String {
+        // Try migration from legacy (unprotected) storage first
+        try await migrateKeyIfNeeded(for: walletId)
+        
+        // Create an LAContext for the biometric prompt
+        let context = LAContext()
+        context.localizedReason = reason
+        
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: walletId.uuidString,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationContext as String: context,
         ]
         
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         
-        guard status == errSecSuccess, let data = result as? Data else {
+        switch status {
+        case errSecSuccess:
+            guard let data = result as? Data,
+                  let privateKeyHex = String(data: data, encoding: .utf8) else {
+                throw KeychainError.invalidData
+            }
+            return privateKeyHex
+            
+        case errSecUserCanceled, errSecAuthFailed:
+            throw KeychainError.biometricAuthFailed
+            
+        case errSecItemNotFound:
+            throw KeychainError.loadFailed(status)
+            
+        default:
             throw KeychainError.loadFailed(status)
         }
-        
-        guard let privateKeyHex = String(data: data, encoding: .utf8) else {
-            throw KeychainError.invalidData
-        }
-        
-        return privateKeyHex
     }
     
-    /// Load private key with Face ID / biometric authentication
-    func loadPrivateKeyWithBiometrics(for walletId: UUID) async throws -> String {
-        let context = LAContext()
-        context.localizedReason = "Authenticate to access your wallet"
+    /// Migrate a legacy key (stored without biometric protection) to the new biometric-protected format.
+    /// This runs once per key — old entry is read, re-saved with SecAccessControl, and the old entry is deleted.
+    private func migrateKeyIfNeeded(for walletId: UUID) async throws {
+        // Check if a legacy key exists (no access control)
+        let legacyQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: walletId.uuidString,
+            kSecReturnData as String: true,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
         
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            // Fallback to passcode if biometrics unavailable
-            if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
-                try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Authenticate to access your wallet")
-                return try loadPrivateKey(for: walletId)
-            }
-            throw KeychainError.biometricsUnavailable
+        var result: AnyObject?
+        let status = SecItemCopyMatching(legacyQuery as CFDictionary, &result)
+        
+        guard status == errSecSuccess,
+              let dict = result as? [String: Any],
+              let data = dict[kSecValueData as String] as? Data,
+              let privateKeyHex = String(data: data, encoding: .utf8) else {
+            // No legacy key found, or it's already migrated — nothing to do
+            return
         }
         
-        try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Authenticate to access your wallet")
-        return try loadPrivateKey(for: walletId)
+        // Check if this item has access control. If it does, it's already migrated.
+        if dict[kSecAttrAccessControl as String] != nil {
+            return
+        }
+        
+        // Delete the old unprotected key
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: walletId.uuidString,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+        
+        // Re-save with biometric protection
+        try savePrivateKey(privateKeyHex, for: walletId)
     }
     
-    /// Delete private key from Keychain
-    func deletePrivateKey(for walletId: UUID) {
+    /// Delete private key from Keychain (raw, no auth required for deletion)
+    private func deletePrivateKeyRaw(for walletId: UUID) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: walletId.uuidString,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+    
+    /// Delete private key from Keychain (public API)
+    func deletePrivateKey(for walletId: UUID) {
+        deletePrivateKeyRaw(for: walletId)
     }
     
     // MARK: - Full Wallet Operations
@@ -185,6 +249,8 @@ final class KeychainStore {
         case loadFailed(OSStatus)
         case invalidData
         case biometricsUnavailable
+        case biometricAuthFailed
+        case accessControlCreationFailed
         
         var errorDescription: String? {
             switch self {
@@ -196,6 +262,10 @@ final class KeychainStore {
                 return "Keychain data is corrupted"
             case .biometricsUnavailable:
                 return "Face ID / Touch ID is not available"
+            case .biometricAuthFailed:
+                return "Biometric authentication was cancelled or failed"
+            case .accessControlCreationFailed:
+                return "Failed to create biometric access control"
             }
         }
     }

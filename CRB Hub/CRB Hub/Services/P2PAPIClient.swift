@@ -2,7 +2,30 @@ import Foundation
 
 /// Cereblix P2P Exchange (OTC) API client
 /// Public endpoints + authenticated trading endpoints
+/// All user inputs are sanitized before being sent to the server.
 enum P2PAPIClient {
+    
+    // MARK: - Input Sanitization
+    
+    /// Maximum chat message length
+    private static let maxChatLength = 1000
+    
+    /// Sanitize a chat message: trim, strip control characters, limit length
+    private static func sanitizeChat(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleaned = trimmed.unicodeScalars.filter { !$0.properties.isDefaultIgnorableCodePoint && ($0.value >= 0x20 || $0 == "\n") }
+        let sanitized = String(String.UnicodeScalarView(cleaned))
+        return String(sanitized.prefix(maxChatLength))
+    }
+    
+    /// Validate an ID parameter (trade ID, offer ID, etc.)
+    /// Must be non-empty and contain only safe characters (alphanumeric, hyphen, underscore)
+    private static func validateId(_ id: String) -> Bool {
+        let pattern = "^[a-zA-Z0-9_-]{1,128}$"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return false }
+        let range = NSRange(id.startIndex..., in: id)
+        return regex.firstMatch(in: id, range: range) != nil
+    }
     
     // MARK: - Public Endpoints (no auth)
     
@@ -59,6 +82,7 @@ enum P2PAPIClient {
     
     /// POST /otc/offers/cancel — cancel own offer
     static func cancelOffer(token: String, offerId: String) async throws {
+        guard validateId(offerId) else { throw CRBAPIError.badRequest("Invalid offer ID") }
         struct CancelRequest: Codable { let id: String }
         try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/offers/cancel", token: token, body: CancelRequest(id: offerId))
     }
@@ -75,7 +99,8 @@ enum P2PAPIClient {
     
     /// GET /otc/trade?id= — trade detail
     static func getTrade(token: String, tradeId: String) async throws -> P2PTrade {
-        try await APIClient.getAuth("\(APIConfig.p2pAPI)/trade?id=\(tradeId)", token: token, type: P2PTrade.self)
+        guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
+        return try await APIClient.getAuth("\(APIConfig.p2pAPI)/trade?id=\(tradeId)", token: token, type: P2PTrade.self)
     }
     
     /// GET /otc/mytrades — all my trades
@@ -120,8 +145,11 @@ enum P2PAPIClient {
     
     /// POST /otc/chat — send chat message
     static func sendChat(token: String, tradeId: String, text: String) async throws {
+        guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
+        let sanitizedText = sanitizeChat(text)
+        guard !sanitizedText.isEmpty else { throw CRBAPIError.badRequest("Chat message cannot be empty") }
         struct ChatRequest: Codable { let id: String; let text: String }
-        try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/chat", token: token, body: ChatRequest(id: tradeId, text: text))
+        try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/chat", token: token, body: ChatRequest(id: tradeId, text: sanitizedText))
     }
     
     /// POST /otc/block
