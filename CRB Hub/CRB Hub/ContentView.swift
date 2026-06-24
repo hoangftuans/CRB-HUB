@@ -31,6 +31,7 @@ struct ContentView: View {
                 appLockView
             }
         }
+        .keyboardDismissSupport()
         .animation(.easeInOut(duration: 0.3), value: appState.hasCompletedOnboarding)
         .animation(.easeInOut(duration: 0.2), value: appState.isAppLocked)
         .onChange(of: scenePhase) { _, newPhase in
@@ -159,4 +160,46 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environment(AppState())
+}
+
+private extension View {
+    func keyboardDismissSupport() -> some View {
+        modifier(KeyboardDismissModifier())
+    }
+}
+
+private struct KeyboardDismissModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button {
+                        dismissKeyboard()
+                    } label: {
+                        Label("Done".localized, systemImage: "keyboard.chevron.compact.down")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                }
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 24)
+                    .onChanged { value in
+                        guard value.translation.height > 18, abs(value.translation.height) > abs(value.translation.width) else {
+                            return
+                        }
+                        dismissKeyboard()
+                    }
+            )
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
 }
