@@ -271,23 +271,27 @@ struct MiningDashboardView: View {
 
     private var miningProfitEstimate: MiningProfitEstimate? {
         let fallbackHashrate = viewModel.totalHashrate > 0 ? viewModel.totalHashrate : (viewModel.myMiner?.hashrate ?? 0)
-        let enteredHashrate = Decimal(string: calculatorHashrate.trimmingCharacters(in: .whitespacesAndNewlines))
-        let hashrateDecimal = (enteredHashrate ?? (fallbackHashrate > 0 ? Decimal(string: String(fallbackHashrate / calculatorUnit.multiplier)) : nil))
+        let enteredHashrate = parseMiningDecimal(calculatorHashrate)
+        let fallbackInputHashrate: Decimal? = fallbackHashrate > 0
+            ? Decimal(string: String(fallbackHashrate / calculatorUnit.multiplier))
+            : Decimal(100)
+        let hashrateDecimal = enteredHashrate ?? fallbackInputHashrate
         guard let hashrateDecimal, hashrateDecimal > 0 else { return nil }
 
-        guard let networkHashrate = appState.chainStatus?.hashrate, networkHashrate > 0 else { return nil }
+        let networkHashrate = appState.chainStatus?.hashrate ?? viewModel.poolStats?.pool_hashrate ?? 0
+        guard networkHashrate > 0 else { return nil }
         let networkHashrateDecimal = Decimal(string: String(networkHashrate)) ?? 0
         guard networkHashrateDecimal > 0 else { return nil }
 
         let minerHashrate = hashrateDecimal * (Decimal(string: String(calculatorUnit.multiplier)) ?? 1)
-        let blockReward = appState.p2pStats?.block_reward_crb ?? appState.chainStatus.map { CRBUnits.toDisplayCRB($0.reward) } ?? 0
+        let blockReward = appState.p2pStats?.block_reward_crb ?? appState.chainStatus.map { CRBUnits.toDisplayCRB($0.reward) } ?? 50
         let blockTime = Decimal(appState.p2pStats?.block_time_secs ?? 60)
         let priceUSDT = appState.cachedCRBPriceUSDT
         let fiatRate = appState.cachedFXRates[appState.selectedFiatCurrency] ?? CurrencyManager.fallbackRates[appState.selectedFiatCurrency] ?? 1
-        let powerWatts = Decimal(string: calculatorPowerWatts.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-        let electricityPrice = Decimal(string: calculatorElectricityPrice.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let powerWatts = parseMiningDecimal(calculatorPowerWatts) ?? 0
+        let electricityPrice = parseMiningDecimal(calculatorElectricityPrice) ?? 0
 
-        guard blockReward > 0, blockTime > 0, priceUSDT > 0 else { return nil }
+        guard blockReward > 0, blockTime > 0 else { return nil }
 
         let poolFeePermil = Decimal(viewModel.poolStats?.fee_permil ?? 0)
         let poolFeeRate = max(0, min(poolFeePermil / 1000, 1))
@@ -310,6 +314,14 @@ struct MiningDashboardView: View {
             monthlyProfitFiat: monthlyProfitFiat,
             sourceNote: "Estimate follows the pool calculator: your hashrate divided by live network hashrate, multiplied by blocks per day and block reward. Pool revenue subtracts pool fee; solo is expected value."
         )
+    }
+
+    private func parseMiningDecimal(_ value: String) -> Decimal? {
+        let normalized = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard !normalized.isEmpty else { return nil }
+        return Decimal(string: normalized)
     }
 
     private func calculatorInput(_ label: String, text: Binding<String>, placeholder: String, keyboard: UIKeyboardType) -> some View {
