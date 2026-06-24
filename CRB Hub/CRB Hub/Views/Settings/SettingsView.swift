@@ -1,7 +1,9 @@
 import SwiftUI
+import StoreKit
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @State private var supportTipStore = SupportTipStore()
     @State private var showExportKey = false
     @State private var exportWalletId: UUID?
     @State private var exportedKey: String?
@@ -9,33 +11,34 @@ struct SettingsView: View {
     @State private var deleteWalletId: UUID?
     @State private var nodeURLInput = ""
     @State private var savedNodeURL = false
-    @State private var copiedDonationAddress = false
     @State private var walletPassword = ""
     @State private var walletPasswordConfirm = ""
     @State private var walletPasswordError: String?
     @State private var walletPasswordSuccess: String?
     @State private var isUpdatingWalletPassword = false
-    
-    // Địa chỉ ví nhận donate
-    private let donationAddress = "crb1bcf10b1d12f028f8a3583010c1be8f228360727b"
+    @State private var selectedTipUSDTWallet: USDTWallet?
+    @State private var selectedTipUSDTRecipient = ""
+    @State private var copiedTipAddress: String?
 
     private var appVersionText: String {
-        let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let build = (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let infoDict = Bundle.main.localizedInfoDictionary ?? Bundle.main.infoDictionary
+        let version = infoDict?["CFBundleShortVersionString"] as? String
+        let build = infoDict?["CFBundleVersion"] as? String
 
-        guard let version, !version.isEmpty else {
-            if let build, !build.isEmpty {
-                return "Build \(build)"
+        let cleanedVersion = version?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedBuild = build?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let finalVersion = cleanedVersion, !finalVersion.isEmpty else {
+            if let finalBuild = cleanedBuild, !finalBuild.isEmpty {
+                return "1.0 (\(finalBuild))"
             }
-            return "Unknown"
+            return "1.0"
         }
 
-        if let build, !build.isEmpty, build != version {
-            return "\(version) (\(build))"
+        if let finalBuild = cleanedBuild, !finalBuild.isEmpty, finalBuild != finalVersion {
+            return "\(finalVersion) (\(finalBuild))"
         }
-        return version
+        return finalVersion
     }
     
     var body: some View {
@@ -64,8 +67,8 @@ struct SettingsView: View {
                             // SafeTrade API
                             safeTradeAPISection
 
-                            // Support Developer
-                            donateSection
+                            // Support Project
+                            supportProjectSection
 
                             // About
                             aboutSection
@@ -80,6 +83,9 @@ struct SettingsView: View {
             .onAppear {
                 nodeURLInput = appState.nodeBaseURL
             }
+            .task {
+                await supportTipStore.loadProducts()
+            }
             .alert("Delete Wallet".localized, isPresented: $showDeleteConfirm) {
                 Button("Cancel".localized, role: .cancel) {}
                 Button("Delete".localized, role: .destructive) {
@@ -93,6 +99,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showExportKey) {
                 exportKeySheet
+            }
+            .sheet(item: $selectedTipUSDTWallet) { wallet in
+                SendUSDTSheet(wallet: wallet, prefilledRecipient: selectedTipUSDTRecipient)
             }
         }
     }
@@ -637,70 +646,86 @@ struct SettingsView: View {
         }
         .glassCard()
     }
-    
-    // MARK: - Support Developer
-    
-    private var donateSection: some View {
+
+    // MARK: - Support Project
+
+    private var supportProjectSection: some View {
         VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
-            SectionHeader(title: "Support Developer".localized, icon: "heart.fill")
-            
-            Text("If CRB Hub has been helpful, you can send a little CRB to invite the developer a coffee or banh mi while the next update is cooking.".localized)
+            SectionHeader(title: "Support CRB Hub".localized, icon: "heart.fill")
+
+            Text("Optional App Store tips help support ongoing development. Tips do not unlock features or change wallet functionality.".localized)
                 .font(.system(size: 13))
                 .foregroundColor(CRBTheme.Colors.muted)
                 .multilineTextAlignment(.leading)
-            
-            VStack(spacing: CRBTheme.Spacing.md) {
+
+            if supportTipStore.isLoading {
                 HStack(spacing: CRBTheme.Spacing.sm) {
-                    Text(AddressValidator.truncatedAddress(donationAddress))
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundColor(CRBTheme.Colors.cyan)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-
-                    Spacer()
-
-                    Button {
-                        UIPasteboard.general.string = donationAddress
-                        withAnimation { copiedDonationAddress = true }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            withAnimation { copiedDonationAddress = false }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: copiedDonationAddress ? "checkmark" : "doc.on.doc")
-                            Text(copiedDonationAddress ? "Copied!".localized : "Copy".localized)
-                        }
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(copiedDonationAddress ? CRBTheme.Colors.success : CRBTheme.Colors.cyan)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(copiedDonationAddress ? CRBTheme.Colors.success.opacity(0.1) : CRBTheme.Colors.cyan.opacity(0.1))
-                        .clipShape(Capsule())
-                    }
+                    ProgressView()
+                        .tint(CRBTheme.Colors.cyan)
+                    Text("Loading support options...".localized)
+                        .font(.system(size: 13))
+                        .foregroundColor(CRBTheme.Colors.muted)
                 }
-                
-                NavigationLink {
-                    SendView(prefilledAddress: donationAddress)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "paperplane.fill")
-                        Text("Send".localized)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            } else if supportTipStore.products.isEmpty {
+                Text("Support tips are not available yet.".localized)
+                    .font(.system(size: 13))
+                    .foregroundColor(CRBTheme.Colors.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(CRBTheme.Spacing.md)
+                    .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            } else {
+                VStack(spacing: CRBTheme.Spacing.sm) {
+                    ForEach(supportTipStore.products) { product in
+                        Button {
+                            Task {
+                                await supportTipStore.purchase(product)
+                            }
+                        } label: {
+                            HStack(spacing: CRBTheme.Spacing.sm) {
+                                Image(systemName: "cup.and.saucer.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(product.displayName)
+                                        .font(.system(size: 13, weight: .bold))
+                                    Text(product.description)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(CRBTheme.Colors.muted)
+                                        .lineLimit(2)
+                                }
+                                Spacer()
+                                Text(product.displayPrice)
+                                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            }
+                            .foregroundColor(CRBTheme.Colors.ink)
+                            .padding(CRBTheme.Spacing.md)
+                            .background(CRBTheme.Colors.backgroundSecondary.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(supportTipStore.isPurchasing)
                     }
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(Color(hex: 0x06121F))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(CRBTheme.Colors.cyan)
-                    .clipShape(Capsule())
                 }
             }
-            .padding(CRBTheme.Spacing.sm)
-            .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+
+            if let message = supportTipStore.message {
+                Text(message.localized)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.buyGreen)
+            }
+
+            if let error = supportTipStore.errorMessage {
+                Text(error)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.error)
+            }
         }
         .glassCard()
     }
-    
     // MARK: - About
     
     private var aboutSection: some View {
@@ -802,6 +827,10 @@ struct SettingsView: View {
                     .lineLimit(1)
             }
             .font(.system(size: 13))
+
+            Divider().background(CRBTheme.Colors.cardBorder)
+
+            developerDonateSection
             
             Divider().background(CRBTheme.Colors.cardBorder)
             
@@ -810,6 +839,171 @@ struct SettingsView: View {
                 .foregroundColor(CRBTheme.Colors.muted.opacity(0.7))
         }
         .glassCard()
+    }
+
+    private var developerDonateSection: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            HStack(spacing: CRBTheme.Spacing.sm) {
+                Image(systemName: "heart.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(CRBTheme.Colors.buyGreen)
+                Text("Donate Tips".localized)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(CRBTheme.Colors.ink)
+                Spacer()
+            }
+
+            Text("If CRB Hub is useful, you can optionally send a CRB or USDT tip to support development. Tips do not unlock features or change wallet behavior.".localized)
+                .font(.system(size: 12))
+                .foregroundColor(CRBTheme.Colors.muted)
+                .multilineTextAlignment(.leading)
+
+            if DeveloperTipConfig.crbAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                DeveloperTipConfig.configuredUSDTRecipients.isEmpty {
+                tipUnavailableView
+            } else {
+                let crbAddress = DeveloperTipConfig.crbAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !crbAddress.isEmpty {
+                    cryptoTipCard(
+                        asset: "CRB",
+                        network: "Cereblix",
+                        address: crbAddress,
+                        icon: "bitcoinsign.circle.fill",
+                        color: CRBTheme.Colors.cyan
+                    ) {
+                        NavigationLink {
+                            SendView(prefilledAddress: crbAddress)
+                        } label: {
+                            tipActionLabel("Send CRB".localized, icon: "paperplane.fill")
+                        }
+                        .disabled(!AddressValidator.isValidAddress(crbAddress))
+                        .opacity(AddressValidator.isValidAddress(crbAddress) ? 1 : 0.45)
+                    }
+                }
+
+                ForEach(DeveloperTipConfig.configuredUSDTRecipients, id: \.network) { recipient in
+                    cryptoTipCard(
+                        asset: "USDT",
+                        network: recipient.network.p2pReceiveLabel,
+                        address: recipient.address,
+                        icon: "dollarsign.circle.fill",
+                        color: CRBTheme.Colors.buyGreen
+                    ) {
+                        usdtTipMenu(network: recipient.network, recipient: recipient.address)
+                    }
+                }
+            }
+
+            if copiedTipAddress != nil {
+                Text("Tip address copied.".localized)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.buyGreen)
+            }
+        }
+    }
+
+    private var tipUnavailableView: some View {
+        Text("Crypto tip addresses are not configured yet.".localized)
+            .font(.system(size: 12))
+            .foregroundColor(CRBTheme.Colors.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(CRBTheme.Spacing.md)
+            .background(CRBTheme.Colors.backgroundSecondary.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+    }
+
+    private func cryptoTipCard<Action: View>(
+        asset: String,
+        network: String,
+        address: String,
+        icon: String,
+        color: Color,
+        @ViewBuilder action: () -> Action
+    ) -> some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            HStack(spacing: CRBTheme.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(color)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(asset)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(CRBTheme.Colors.ink)
+                    Text(network.localized)
+                        .font(.system(size: 11))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                }
+                Spacer()
+                QRCodeView(data: address, size: 56)
+            }
+
+            Text(AddressValidator.truncatedAddress(address, leading: 12, trailing: 10))
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundColor(CRBTheme.Colors.cyan)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .textSelection(.enabled)
+
+            HStack(spacing: CRBTheme.Spacing.sm) {
+                Button {
+                    SecurePasteboard.copy(address)
+                    copiedTipAddress = address
+                } label: {
+                    tipActionLabel("Copy".localized, icon: "doc.on.doc")
+                }
+                .buttonStyle(.plain)
+
+                action()
+            }
+        }
+        .padding(CRBTheme.Spacing.md)
+        .background(CRBTheme.Colors.backgroundSecondary.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+        .overlay(
+            RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
+                .stroke(CRBTheme.Colors.cardBorder, lineWidth: 1)
+        )
+    }
+
+    private func tipActionLabel(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, CRBTheme.Spacing.sm)
+        .padding(.horizontal, CRBTheme.Spacing.sm)
+        .background(CRBTheme.Colors.cyan.opacity(0.08))
+        .foregroundColor(CRBTheme.Colors.cyan)
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+    }
+
+    private func usdtTipMenu(network: USDTNetwork, recipient: String) -> some View {
+        let wallets = appState.linkedUSDTWallets.filter { $0.network == network }
+
+        return Menu {
+            if wallets.isEmpty {
+                Button("No matching USDT wallet".localized) {}
+                    .disabled(true)
+            } else {
+                ForEach(wallets) { wallet in
+                    Button {
+                        selectedTipUSDTRecipient = recipient
+                        selectedTipUSDTWallet = wallet
+                    } label: {
+                        Text("\(wallet.name) - \(AddressValidator.truncatedAddress(wallet.address, leading: 8, trailing: 6))")
+                    }
+                }
+            }
+        } label: {
+            tipActionLabel("Send USDT".localized, icon: "paperplane.fill")
+        }
+        .disabled(wallets.isEmpty)
+        .opacity(wallets.isEmpty ? 0.45 : 1)
     }
     
     // MARK: - Export Key Sheet

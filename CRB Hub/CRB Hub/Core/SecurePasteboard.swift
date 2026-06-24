@@ -28,7 +28,7 @@ enum SecurePasteboard {
     }
     
     /// Copy a non-sensitive string to the clipboard (no expiry).
-    /// Use this for public data like wallet addresses, donation addresses, etc.
+    /// Use this for public data like wallet addresses.
     @MainActor
     static func copy(_ string: String) {
         UIPasteboard.general.string = string

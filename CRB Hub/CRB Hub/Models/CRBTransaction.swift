@@ -3,6 +3,7 @@ import Foundation
 /// Transaction model from /api/history and /api/tx
 struct CRBTransaction: Codable, Identifiable {
     var id: String { txid }
+    static let knownPoolAddress = "crb1b1a90fe0fdd522368cc784973c768cf3ca46c9d6"
     
     let from: String?
     let to: String?
@@ -15,17 +16,28 @@ struct CRBTransaction: Codable, Identifiable {
     
     /// Determine transaction type relative to a given address
     func transactionType(for address: String) -> TransactionType {
-        if from == nil && to == address {
+        if isMiningPayout(for: address) {
             return .mined
-        } else if to == address {
-            if from == "crb1b1a90fe0fdd522368cc784973c768cf3ca46c9d6" {
-                return .mined
-            }
+        } else if to?.lowercased() == address.lowercased() {
             return .received
-        } else if from == address {
+        } else if from?.lowercased() == address.lowercased() {
             return .sent
         }
         return .unknown
+    }
+
+    func isMiningPayout(for address: String, poolAddress: String? = nil) -> Bool {
+        let walletAddress = address.lowercased()
+        guard to?.lowercased() == walletAddress else { return false }
+
+        if from == nil {
+            return true
+        }
+
+        let poolCandidates = [poolAddress, Self.knownPoolAddress]
+            .compactMap { $0?.lowercased() }
+
+        return poolCandidates.contains(from?.lowercased() ?? "")
     }
     
     enum TransactionType {

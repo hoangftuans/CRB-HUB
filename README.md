@@ -12,11 +12,8 @@
 
 **CRB Hub** is a premium native iOS non-custodial wallet built using SwiftUI for the Cereblix (CRB) blockchain. The application delivers robust local key management, mining dashboard statistics, P2P exchange trading, and multi-language support (11 languages) with local fiat currency conversion.
 
-### 👤 Project Owner & Developer Support
-This project is owned and maintained by **Hoang Tuan Nguyen**. If you find this app helpful, please consider supporting the project to fund further development!
-
-* **Donation Address (Cereblix)**: `crb1bcf10b1d12f028f8a3583010c1be8f228360727b`
-* **Direct Donation**: You can donate directly inside the app's Settings menu.
+### 👤 Project Owner
+This project is owned and maintained by **Hoang Tuan Nguyen**.
 
 > [!IMPORTANT]
 > **Cereblix Native & Secured**: This app runs **100% on the Cereblix network**. All private-key access is protected through iOS Keychain access control (`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` + current biometric set) and sensitive wallet actions require Face ID / Touch ID with password fallback. Your private keys never leave your device.
@@ -41,6 +38,9 @@ This project is owned and maintained by **Hoang Tuan Nguyen**. If you find this 
 * Restricted P2P USDT rails to the project-supported networks and validates receiving addresses before create/take actions.
 * Replaced floating-point money paths with `Decimal` caches, formatting, conversion, and token-balance parsing.
 * Hardened custom node URLs, URL query construction, clipboard handling, app background privacy, app version display, and Settings scrolling behavior.
+* Standardized P2P trading labels (SELL/BUY) and fully synchronized 11-language localizations across all P2P screens (tickers, stats, order books, empty states, chat, and challenge login steps).
+* Locked settings views horizontally (`ScrollView(.vertical)`) and wrapped/resized settings sections to prevent horizontal dragging or scrolling overflow on smaller devices.
+* Made application version display robust and dynamic via bundle dictionaries query, with fallback defaults for Xcode Previews and Simulator builds.
 
 ### 🛠️ Architecture & Tech Stack
 * **UI**: SwiftUI (iOS 18.0+)
@@ -110,11 +110,8 @@ graph TD
 
 **CRB Hub** là ứng dụng ví phi lưu ký (non-custodial wallet) chạy native trên hệ điều hành iOS dành cho mạng lưới Cereblix (CRB). Ứng dụng cung cấp các tính năng quản lý tài sản bảo mật cao, theo dõi khai thác (mining monitoring), trao đổi giao dịch P2P OTC và tích hợp đa ngôn ngữ toàn diện.
 
-### 👤 Chủ Sở Hữu & Ủng Hộ Phát Triển
-Dự án được sở hữu và phát triển bởi **Hoang Tuan Nguyen**. Mọi sự ủng hộ (donate) từ cộng đồng sẽ là nguồn động lực to lớn để tiếp tục nâng cấp và phát triển ứng dụng trong tương lai!
-
-* **Địa chỉ ví nhận ủng hộ (Cereblix)**: `crb1bcf10b1d12f028f8a3583010c1be8f228360727b`
-* **Gửi trực tiếp**: Bạn có thể thực hiện gửi tiền ủng hộ trực tiếp trong phần Cài đặt (Settings) của ứng dụng.
+### 👤 Chủ Sở Hữu
+Dự án được sở hữu và phát triển bởi **Hoang Tuan Nguyen**.
 
 > [!IMPORTANT]
 > **Hoạt động 100% trên Cereblix**: Dự án được xây dựng và chạy **100% trực tiếp trên mạng lưới Cereblix**. Mọi đường đọc khóa bí mật đều đi qua Keychain access control (`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` + bộ sinh trắc học hiện tại), kết hợp Face ID / Touch ID và cơ chế nhập mật khẩu dự phòng. Khóa bí mật của bạn không bao giờ rời khỏi thiết bị.
@@ -139,6 +136,9 @@ Dự án được sở hữu và phát triển bởi **Hoang Tuan Nguyen**. Mọ
 * Giới hạn rail USDT cho P2P theo mạng dự án hỗ trợ và validate địa chỉ trước khi tạo/take lệnh.
 * Chuyển các đường tiền khỏi `Double`, dùng `Decimal` cho cache giá, tỷ giá, formatter, balance và P2P amount.
 * Hardening custom node URL, URL query, clipboard, che app khi background, hiển thị version và khóa scroll ngang ở Settings.
+* Chuẩn hóa và đồng bộ hóa ngôn ngữ sàn giao dịch P2P hoàn chỉnh (nhãn MUA/BÁN, thông số ticker, sổ lệnh, trạng thái trống, đoạn chat trực tiếp, và các bước đăng nhập bảo mật) hỗ trợ tiếng Việt và 11 ngôn ngữ.
+* Khóa cố định chiều ngang Settings (`ScrollView(.vertical)`), thu gọn và tối ưu hóa các section cài đặt để chống trượt/kéo ngang màn hình trên thiết bị nhỏ (như iPhone SE/12 mini).
+* Tự động hiển thị động phiên bản ứng dụng trong About lấy trực tiếp từ Bundle, tích hợp cơ chế fallback dự phòng chống lỗi hiển thị "Unknown" khi chạy Xcode Preview hoặc Simulator.
 
 ### 🛠️ Công Nghệ & Kiến Trúc
 * **Giao Diện**: SwiftUI (iOS 18.0+)

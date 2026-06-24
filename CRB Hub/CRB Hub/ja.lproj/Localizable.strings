@@ -1,4 +1,4 @@
-/* JA Localizable.strings (Updated with Donation) */
+/* JA Localizable.strings */
 
 "%1$d/64 characters" = "%1$d/64文字";
 "24h Change" = "24時間比";
@@ -88,7 +88,6 @@
 "I have backed up my private key" = "秘密鍵のバックアップを保存しました";
 "I understand that losing this key means losing my CRB forever" = "この鍵を紛失すると、CRBが永久に失われることを理解しています";
 "Idle" = "オフライン";
-"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "CRB Hubがお役に立ちましたら、少額のCRBを寄付して開発者をサポートすることをご検討ください。";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "この鍵を紛失すると、ウォレットへのアクセス権を永久に失います。誰も復元することはできません。";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "この鍵を紛失すると、資金は永久に失われます。オフラインで安全に保管してください。";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "秘密鍵を紛失した場合、お客様のCRBは永久に失われます。当社を含め、誰も復元することはできません。";
@@ -193,7 +192,6 @@
 "Spendable" = "利用可能残高";
 "Start Using CRB Hub" = "CRB Hubの利用を開始";
 "Success" = "成功";
-"Support Developer" = "開発者をサポート";
 "This is the ONLY way to recover your wallet" = "これはウォレットを復元する唯一の方法です";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "このウォレットはデバイスから永久に削除されます。秘密鍵のバックアップがあることを必ず確認してください。";
 "Ticker" = "相場情報";

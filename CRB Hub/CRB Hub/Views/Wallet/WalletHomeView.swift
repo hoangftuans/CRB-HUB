@@ -174,12 +174,16 @@ struct WalletHomeView: View {
     // MARK: - Stats Grid
     
     private func statsGrid(_ balance: BalanceResponse) -> some View {
-        LazyVGrid(columns: [
+        let walletAddress = appState.selectedWallet?.address ?? balance.address
+        let minedFromHistory = viewModel.minedAmountFromHistory(for: walletAddress)
+        let displayedMined = max(balance.mined ?? 0, minedFromHistory)
+
+        return LazyVGrid(columns: [
             GridItem(.flexible()),
             GridItem(.flexible()),
         ], spacing: CRBTheme.Spacing.md) {
             StatCard(icon: "lock.open.fill", label: "Spendable".localized, value: CRBUnits.formatCRBCompact(balance.spendable), color: CRBTheme.Colors.buyGreen)
-            StatCard(icon: "hammer.fill", label: "Mined".localized, value: CRBUnits.formatCRBCompact(balance.mined ?? 0), color: CRBTheme.Colors.warning)
+            StatCard(icon: "hammer.fill", label: "Mined".localized, value: CRBUnits.formatCRBCompact(displayedMined), color: CRBTheme.Colors.warning)
             StatCard(icon: "arrow.down.left", label: "Received".localized, value: CRBUnits.formatCRBCompact(balance.received ?? 0), color: CRBTheme.Colors.cyan)
             StatCard(icon: "arrow.up.right", label: "Sent".localized, value: CRBUnits.formatCRBCompact(balance.sent ?? 0), color: CRBTheme.Colors.sellRed)
             StatCard(icon: "number", label: "Tx Count".localized, value: "\(balance.txns ?? 0)", color: CRBTheme.Colors.violet)

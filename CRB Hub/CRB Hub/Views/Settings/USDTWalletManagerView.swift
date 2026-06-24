@@ -373,7 +373,7 @@ struct AddUSDTWalletSheet: View {
 
     @State private var name = ""
     @State private var provider: USDTProvider = .binance
-    @State private var network: USDTNetwork = .bep20
+    @State private var network: USDTNetwork = .polygon
     @State private var address = ""
     @State private var validationError: String?
 
@@ -484,13 +484,12 @@ struct AddUSDTWalletSheet: View {
         validationError = nil
         let cleanAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Basic Address validation
-        if network == .trc20 {
-            guard cleanAddress.hasPrefix("T") && cleanAddress.count == 34 else {
-                validationError = "Tron addresses must start with 'T' and be 34 characters.".localized
-                return
-            }
-        } else if network == .solana {
+        guard USDTNetwork.p2pSupportedNetworks.contains(network) else {
+            validationError = "Only Polygon and Solana USDT wallets are supported for P2P.".localized
+            return
+        }
+
+        if network == .solana {
             let allowed = CharacterSet(charactersIn: "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
             guard cleanAddress.count >= 32,
                   cleanAddress.count <= 44,
@@ -527,9 +526,19 @@ struct SendUSDTSheet: View {
     @State private var recipient = ""
     @State private var amount = ""
     @State private var password = ""
+    @State private var emailCode = ""
+    @State private var otpCode = ""
+    @State private var phoneCode = ""
     @State private var requiresPassword = false
     @State private var isSending = false
+    @State private var isGeneratingCode = false
     @State private var error: String?
+    @State private var codeMessage: String?
+
+    init(wallet: USDTWallet, prefilledRecipient: String = "") {
+        self.wallet = wallet
+        _recipient = State(initialValue: prefilledRecipient)
+    }
 
     var body: some View {
         NavigationStack {
@@ -555,6 +564,8 @@ struct SendUSDTSheet: View {
                         inputField("Recipient".localized, text: $recipient, placeholder: wallet.network == .solana ? "Solana address" : "0x...", keyboard: .default)
                         inputField("Amount USDT".localized, text: $amount, placeholder: "0.00", keyboard: .decimalPad)
 
+                        safeTradeVerificationSection
+
                         if requiresPassword {
                             SecureField("Wallet Password".localized, text: $password)
                                 .textFieldStyle(.plain)
@@ -573,7 +584,7 @@ struct SendUSDTSheet: View {
                         GradientButton(
                             title: isSending ? "Sending...".localized : (requiresPassword ? "Unlock & Send".localized : "Send USDT".localized),
                             icon: "paperplane.fill",
-                            isDisabled: isSending || recipient.isEmpty || amount.isEmpty || (requiresPassword && password.isEmpty)
+                            isDisabled: isSending || isGeneratingCode || recipient.isEmpty || amount.isEmpty || (requiresPassword && password.isEmpty)
                         ) {
                             send()
                         }
@@ -596,6 +607,47 @@ struct SendUSDTSheet: View {
                 }
             }
         }
+    }
+
+    private var safeTradeVerificationSection: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+            Text("SafeTrade Withdraw Verification".localized)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(CRBTheme.Colors.ink)
+
+            Text("Generate an email code first, then enter any codes required by your SafeTrade account before sending.".localized)
+                .font(.system(size: 11))
+                .foregroundColor(CRBTheme.Colors.muted)
+
+            Button {
+                generateWithdrawCode()
+            } label: {
+                HStack {
+                    Image(systemName: isGeneratingCode ? "hourglass" : "envelope.badge.shield.half.filled")
+                    Text(isGeneratingCode ? "Generating code...".localized : "Generate Email Code".localized)
+                        .font(.system(size: 12, weight: .bold))
+                    Spacer()
+                }
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.cyan.opacity(0.1))
+                .foregroundColor(CRBTheme.Colors.cyan)
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            }
+            .disabled(isGeneratingCode || recipient.isEmpty || amount.isEmpty)
+
+            inputField("Email Code".localized, text: $emailCode, placeholder: "Optional if SafeTrade does not require it", keyboard: .numberPad)
+            inputField("Authenticator Code".localized, text: $otpCode, placeholder: "Optional", keyboard: .numberPad)
+            inputField("Phone Code".localized, text: $phoneCode, placeholder: "Optional", keyboard: .numberPad)
+
+            if let codeMessage {
+                Text(codeMessage.localized)
+                    .font(CRBTheme.Typography.caption())
+                    .foregroundColor(CRBTheme.Colors.buyGreen)
+            }
+        }
+        .padding(CRBTheme.Spacing.md)
+        .background(CRBTheme.Colors.backgroundSecondary.opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
     }
 
     private func inputField(_ label: String, text: Binding<String>, placeholder: String, keyboard: UIKeyboardType) -> some View {
@@ -632,6 +684,11 @@ struct SendUSDTSheet: View {
                     wallet: wallet,
                     to: recipient.trimmingCharacters(in: .whitespacesAndNewlines),
                     amount: amountDecimal,
+                    safeTradeCodes: SafeTradeWithdrawCodes(
+                        emailCode: emailCode,
+                        otpCode: otpCode,
+                        phoneCode: phoneCode
+                    ),
                     fallbackPassword: requiresPassword ? password : nil
                 )
                 dismiss()
@@ -644,6 +701,32 @@ struct SendUSDTSheet: View {
             isSending = false
         }
     }
+
+    private func generateWithdrawCode() {
+        guard let amountDecimal = Decimal(string: amount), amountDecimal > 0 else {
+            error = "Invalid USDT amount"
+            return
+        }
+
+        isGeneratingCode = true
+        error = nil
+        codeMessage = nil
+
+        Task {
+            do {
+                try await SafeTradeAPIService.shared.generateWithdrawCode(
+                    wallet: wallet,
+                    to: recipient.trimmingCharacters(in: .whitespacesAndNewlines),
+                    amount: amountDecimal,
+                    type: .email
+                )
+                codeMessage = "Email code sent by SafeTrade."
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isGeneratingCode = false
+        }
+    }
 }
 
 // MARK: - Generate Native Wallet Sheet
@@ -653,7 +736,7 @@ struct GenerateNativeUSDTSheet: View {
     @Environment(AppState.self) private var appState
 
     @State private var name = ""
-    @State private var network: USDTNetwork = .bep20
+    @State private var network: USDTNetwork = .polygon
     @State private var generatedWallet: (privateKey: String, address: String)?
     @State private var isCreating = false
     @State private var copiedKey = false

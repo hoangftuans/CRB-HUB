@@ -1,4 +1,4 @@
-/* DE Localizable.strings (Updated with Donation) */
+/* DE Localizable.strings */
 
 "%1$d/64 characters" = "%1$d/64 Zeichen";
 "24h Change" = "24h Änderung";
@@ -88,7 +88,6 @@
 "I have backed up my private key" = "Ich habe meinen privaten Schlüssel gesichert";
 "I understand that losing this key means losing my CRB forever" = "Ich verstehe, dass der Verlust dieses Schlüssels den dauerhaften Verlust meines CRB bedeutet";
 "Idle" = "Inaktiv";
-"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "Wenn Sie CRB Hub nützlich finden, unterstützen Sie den Entwickler gerne mit einer kleinen CRB-Spende.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "Wenn Sie diesen Schlüssel verlieren, verlieren Sie dauerhaft den Zugriff auf Ihr Wallet. Niemand kann ihn wiederherstellen.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "Wenn Sie diesen Schlüssel verlieren, verlieren Sie Ihr Guthaben für immer. Bewahren Sie ihn offline auf.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "Wenn Sie Ihren privaten Schlüssel verlieren, ist Ihr CRB für immer verloren. Niemand kann ihn wiederherstellen — nicht einmal wir.";
@@ -193,7 +192,6 @@
 "Spendable" = "Verfügbar";
 "Start Using CRB Hub" = "CRB Hub starten";
 "Success" = "Erfolg";
-"Support Developer" = "Entwickler unterstützen";
 "This is the ONLY way to recover your wallet" = "Dies ist die EINZIGE Möglichkeit, Ihr Wallet wiederherzustellen";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "Dies löscht das Wallet dauerhaft von diesem Gerät. Stellen Sie sicher, dass Sie ein Backup des privaten Schlüssels haben.";
 "Ticker" = "Kursliste";

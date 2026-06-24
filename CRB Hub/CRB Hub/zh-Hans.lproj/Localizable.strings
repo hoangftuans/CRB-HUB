@@ -1,4 +1,4 @@
-/* ZH-HANS Localizable.strings (Updated with Donation) */
+/* ZH-HANS Localizable.strings */
 
 "%1$d/64 characters" = "%1$d/64 个字符";
 "24h Change" = "24小时涨跌";
@@ -88,7 +88,6 @@
 "I have backed up my private key" = "我已备份私钥";
 "I understand that losing this key means losing my CRB forever" = "我明白丢失此私钥意味着永远失去我的 CRB";
 "Idle" = "离线";
-"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "如果您觉得 CRB Hub 对您有所帮助，请考虑通过捐赠一些 CRB 来支持/鼓励开发者。";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "如果您丢失了此私钥，您将永久失去对钱包的访问权限。没有人可以恢复它。";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "如果您丢失此私钥，您将永远失去您的资金。请安全地离线保存它。";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "如果您丢失了私钥，您的 CRB 将永久丢失。没有人可以恢复它——甚至我们也无能为力。";
@@ -193,7 +192,6 @@
 "Spendable" = "可用余额";
 "Start Using CRB Hub" = "开始使用 CRB Hub";
 "Success" = "成功";
-"Support Developer" = "支持开发者";
 "This is the ONLY way to recover your wallet" = "这是恢复您钱包的唯一方法";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "这将从该设备中永久删除该钱包。请确保您已备份私钥。";
 "Ticker" = "行情";

@@ -97,6 +97,20 @@ final class WalletViewModel {
         }
     }
 
+    func minedAmountFromHistory(for address: String, poolAddress: String? = nil) -> UInt64 {
+        var total: UInt64 = 0
+
+        for transaction in transactions where transaction.isMiningPayout(for: address, poolAddress: poolAddress) {
+            let result = total.addingReportingOverflow(transaction.amount)
+            if result.overflow {
+                return UInt64.max
+            }
+            total = result.partialValue
+        }
+
+        return total
+    }
+
     func sendCRBSecure(
         wallet: WalletAccount,
         to recipient: String,

@@ -1,4 +1,4 @@
-/* RU Localizable.strings (Updated with Donation) */
+/* RU Localizable.strings */
 
 "%1$d/64 characters" = "%1$d/64 символов";
 "24h Change" = "Изм. за 24ч";
@@ -88,7 +88,6 @@
 "I have backed up my private key" = "Я сделал бэкап приватного ключа";
 "I understand that losing this key means losing my CRB forever" = "Я понимаю, что потеря этого ключа означает потерю моих CRB навсегда";
 "Idle" = "Неактивен";
-"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "Если вам нравится CRB Hub, вы можете поддержать разработчика, отправив немного CRB.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "Если вы потеряете этот ключ, вы навсегда потеряете доступ к своему кошельку. Никто не сможет его восстановить.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "Если вы потеряете этот ключ, вы навсегда потеряете свои средства. Храните его офлайн.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "Если вы потеряете приватный ключ, ваш CRB исчезнет навсегда. Никто не сможет его восстановить — даже мы.";
@@ -193,7 +192,6 @@
 "Spendable" = "Доступно";
 "Start Using CRB Hub" = "Начать использование CRB Hub";
 "Success" = "Успех";
-"Support Developer" = "Поддержать разработчика";
 "This is the ONLY way to recover your wallet" = "Это ЕДИНСТВЕННЫЙ способ восстановить ваш кошелек";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "Это навсегда удалит кошелек с устройства. Убедитесь, что вы сохранили приватный ключ.";
 "Ticker" = "Тикер";

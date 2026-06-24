@@ -1,4 +1,4 @@
-/* VI Localizable.strings (Updated with Donation) */
+/* VI Localizable.strings */
 
 "%1$d/64 characters" = "%1$d/64 ký tự";
 "24h Change" = "Thay đổi 24h";
@@ -88,7 +88,6 @@
 "I have backed up my private key" = "Tôi đã sao lưu khóa bí mật";
 "I understand that losing this key means losing my CRB forever" = "Tôi hiểu rằng mất khóa này có nghĩa là mất CRB vĩnh viễn";
 "Idle" = "Ngoại tuyến";
-"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "Nếu bạn thấy CRB Hub hữu ích, hãy ủng hộ nhà phát triển bằng cách gửi tặng một ít CRB.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "Nếu bạn mất khóa này, bạn sẽ mất quyền truy cập vào ví của mình vĩnh viễn. Không ai có thể khôi phục được nó.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "Nếu mất khóa này, bạn sẽ mất tiền vĩnh viễn. Hãy lưu giữ an toàn ngoại tuyến.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "Nếu bạn mất khóa bí mật, số CRB của bạn sẽ mất vĩnh viễn. Không ai có thể khôi phục lại nó — kể cả chúng tôi.";
@@ -194,7 +193,6 @@
 "Spendable" = "Khả dụng";
 "Start Using CRB Hub" = "Bắt đầu sử dụng CRB Hub";
 "Success" = "Thành công";
-"Support Developer" = "Ủng hộ nhà phát triển";
 "This is the ONLY way to recover your wallet" = "Đây là cách DUY NHẤT để khôi phục ví của bạn";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "Hành động này sẽ xóa vĩnh viễn ví này khỏi thiết bị. Hãy đảm bảo bạn đã lưu lại khóa bí mật của mình.";
 "Ticker" = "Bảng giá";
@@ -350,3 +348,41 @@
 "Sign the challenge with your ed25519 key" = "Ký thử thách bằng khóa ed25519 của bạn";
 "Send signature to get a session token" = "Gửi chữ ký để nhận token phiên làm việc";
 "Token is held in memory only — no persistence" = "Token chỉ được lưu trong bộ nhớ tạm — không lưu trữ lâu dài";
+"Support CRB Hub" = "Ủng hộ CRB Hub";
+"Optional App Store tips help support ongoing development. Tips do not unlock features or change wallet functionality." = "Tip tự nguyện qua App Store giúp hỗ trợ phát triển dự án. Tip không mở khóa tính năng và không thay đổi chức năng ví.";
+"Loading support options..." = "Đang tải lựa chọn ủng hộ...";
+"Support tips are not available yet." = "Các lựa chọn ủng hộ chưa khả dụng.";
+"Thank you for supporting CRB Hub." = "Cảm ơn bạn đã ủng hộ CRB Hub.";
+"Purchase is pending approval." = "Giao dịch đang chờ phê duyệt.";
+"Purchase could not be completed." = "Không thể hoàn tất giao dịch.";
+"The purchase could not be verified." = "Không thể xác minh giao dịch.";
+"SafeTrade Withdraw Verification" = "Xác minh rút tiền SafeTrade";
+"Generate an email code first, then enter any codes required by your SafeTrade account before sending." = "Hãy tạo mã email trước, rồi nhập các mã mà tài khoản SafeTrade yêu cầu trước khi gửi.";
+"Generating code..." = "Đang tạo mã...";
+"Generate Email Code" = "Tạo mã Email";
+"Email Code" = "Mã Email";
+"Optional if SafeTrade does not require it" = "Có thể bỏ trống nếu SafeTrade không yêu cầu";
+"Authenticator Code" = "Mã Authenticator";
+"Phone Code" = "Mã điện thoại";
+"Email code sent by SafeTrade." = "SafeTrade đã gửi mã email.";
+"Only Polygon and Solana USDT wallets are supported for P2P." = "P2P chỉ hỗ trợ ví USDT mạng Polygon và Solana.";
+"Profit Calculator" = "Máy tính lợi nhuận";
+"Unit" = "Đơn vị";
+"Power" = "Công suất";
+"Electricity" = "Giá điện";
+"Pool CRB / Day" = "CRB Pool / Ngày";
+"Solo Expected" = "Solo kỳ vọng";
+"blocks/day" = "khối/ngày";
+"Revenue / Day" = "Doanh thu / Ngày";
+"Power / Day" = "Tiền điện / Ngày";
+"Profit / Day" = "Lợi nhuận / Ngày";
+"Month" = "Tháng";
+"Enter hashrate and wait for live chain price data to estimate mining profit." = "Nhập hashrate và chờ dữ liệu chain/giá trực tiếp để ước tính lợi nhuận đào.";
+"Estimate follows the pool calculator: your hashrate divided by live network hashrate, multiplied by blocks per day and block reward. Pool revenue subtracts pool fee; solo is expected value." = "Ước tính theo máy tính của pool: hashrate của bạn chia cho hashrate mạng trực tiếp, nhân với số khối mỗi ngày và phần thưởng khối. Doanh thu pool đã trừ phí pool; solo là giá trị kỳ vọng.";
+"Donate Tips" = "Donate Tips";
+"If CRB Hub is useful, you can optionally send a CRB or USDT tip to support development. Tips do not unlock features or change wallet behavior." = "Nếu CRB Hub hữu ích, bạn có thể tự nguyện gửi tip bằng CRB hoặc USDT để hỗ trợ phát triển. Tip không mở khóa tính năng và không thay đổi chức năng ví.";
+"Crypto tip addresses are not configured yet." = "Địa chỉ tip crypto chưa được cấu hình.";
+"Tip address copied." = "Đã sao chép địa chỉ tip.";
+"Cereblix" = "Cereblix";
+"Send USDT" = "Gửi USDT";
+"No matching USDT wallet" = "Không có ví USDT phù hợp";

@@ -8,6 +8,9 @@ final class MiningViewModel {
     // MARK: - Pool Stats
     var poolStats: PoolStatsResponse?
     var myMiner: PoolMiner?
+    var historyPayoutAmount: UInt64 = 0
+    var historyPayoutCount = 0
+    var historyPayoutError: String?
     var isLoadingStats = false
     var statsError: String?
     
@@ -66,6 +69,49 @@ final class MiningViewModel {
             // Silent fail for health
         }
     }
+
+    func loadPayoutHistory(address: String) async {
+        historyPayoutError = nil
+
+        do {
+            let poolAddress = poolStats?.pool_address
+            let pageSize = 100
+            let maxPages = 5
+            var transactions: [CRBTransaction] = []
+
+            for page in 0..<maxPages {
+                let pageTransactions = try await CereblixAPIClient.getHistory(
+                    address: address,
+                    limit: pageSize,
+                    offset: page * pageSize
+                )
+                transactions.append(contentsOf: pageTransactions)
+
+                if pageTransactions.count < pageSize {
+                    break
+                }
+            }
+
+            let payouts = transactions.filter { $0.isMiningPayout(for: address, poolAddress: poolAddress) }
+
+            var total: UInt64 = 0
+            for payout in payouts {
+                let result = total.addingReportingOverflow(payout.amount)
+                if result.overflow {
+                    total = UInt64.max
+                    break
+                }
+                total = result.partialValue
+            }
+
+            historyPayoutAmount = total
+            historyPayoutCount = payouts.count
+        } catch {
+            historyPayoutAmount = 0
+            historyPayoutCount = 0
+            historyPayoutError = error.localizedDescription
+        }
+    }
     
     func loadAll(address: String) async {
         await withTaskGroup(of: Void.self) { group in
@@ -73,6 +119,8 @@ final class MiningViewModel {
             group.addTask { await self.loadWorkers(address: address) }
             group.addTask { await self.loadHealth() }
         }
+
+        await loadPayoutHistory(address: address)
     }
     
     func startAutoRefresh(address: String) {
@@ -103,5 +151,20 @@ final class MiningViewModel {
     
     var totalHashrate: Double {
         workers.reduce(0) { $0 + $1.hashrate }
+    }
+
+    var displayedPaid: UInt64 {
+        max(myMiner?.paid ?? 0, historyPayoutAmount)
+    }
+
+    var displayedEarned: UInt64 {
+        let owed = myMiner?.owed ?? 0
+        let result = displayedPaid.addingReportingOverflow(owed)
+        let paidPlusOwed = result.overflow ? UInt64.max : result.partialValue
+        return max(myMiner?.earned ?? 0, paidPlusOwed)
+    }
+
+    var hasMiningPayoutHistory: Bool {
+        historyPayoutAmount > 0 || historyPayoutCount > 0
     }
 }

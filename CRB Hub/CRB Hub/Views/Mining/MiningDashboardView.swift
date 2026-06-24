@@ -4,6 +4,10 @@ struct MiningDashboardView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel = MiningViewModel()
     @State private var showSetup = false
+    @State private var calculatorHashrate = ""
+    @State private var calculatorUnit: MiningHashrateUnit = .mega
+    @State private var calculatorPowerWatts = "120"
+    @State private var calculatorElectricityPrice = "0.12"
     
     var body: some View {
         NavigationStack {
@@ -14,6 +18,9 @@ struct MiningDashboardView: View {
                     VStack(spacing: CRBTheme.Spacing.lg) {
                         // My miner stats
                         myMinerSection
+
+                        // Profit calculator
+                        profitCalculatorSection
                         
                         // Workers
                         workersSection
@@ -27,6 +34,7 @@ struct MiningDashboardView: View {
                     if let addr = appState.selectedWallet?.address {
                         await viewModel.loadAll(address: addr)
                     }
+                    await refreshProfitInputs()
                 }
             }
             .navigationTitle("Mining".localized)
@@ -46,6 +54,7 @@ struct MiningDashboardView: View {
                     await viewModel.loadAll(address: addr)
                     viewModel.startAutoRefresh(address: addr)
                 }
+                await refreshProfitInputs()
             }
             .onDisappear {
                 viewModel.stopAutoRefresh()
@@ -67,6 +76,12 @@ struct MiningDashboardView: View {
             }
         }
     }
+
+    private func refreshProfitInputs() async {
+        await appState.refreshChainStatus()
+        await appState.refreshP2PStats()
+        await appState.refreshFiatRates()
+    }
     
     // MARK: - My Miner
     
@@ -74,20 +89,33 @@ struct MiningDashboardView: View {
         VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
             SectionHeader(title: "My Stats".localized, icon: "hammer.fill")
             
-            if viewModel.isLoadingStats && viewModel.myMiner == nil {
+            if viewModel.isLoadingStats && viewModel.myMiner == nil && !viewModel.hasMiningPayoutHistory {
                 LoadingView(message: "Loading...".localized)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, CRBTheme.Spacing.xl)
-            } else if let miner = viewModel.myMiner {
+            } else if viewModel.myMiner != nil || viewModel.hasMiningPayoutHistory {
+                let miner = viewModel.myMiner
+                let owed = miner?.owed ?? 0
+                let paid = viewModel.displayedPaid
+                let earned = viewModel.displayedEarned
+                let shares = miner?.shares ?? 0
+                let hashrate = miner?.hashrate ?? viewModel.totalHashrate
+
                 // Hashrate hero
                 VStack(spacing: CRBTheme.Spacing.sm) {
-                    Text(CRBUnits.formatHashrate(miner.hashrate))
+                    Text(CRBUnits.formatHashrate(hashrate))
                         .font(.system(size: 32, weight: .heavy, design: .monospaced))
                         .foregroundStyle(CRBTheme.Gradients.primary)
                     
                     Text("Hashrate".localized)
                         .font(CRBTheme.Typography.caption())
                         .foregroundColor(CRBTheme.Colors.muted)
+
+                    if miner == nil && viewModel.hasMiningPayoutHistory {
+                        Text("Mined Transaction".localized)
+                            .font(CRBTheme.Typography.caption())
+                            .foregroundColor(CRBTheme.Colors.warning)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, CRBTheme.Spacing.md)
@@ -96,13 +124,13 @@ struct MiningDashboardView: View {
                 let currency = appState.selectedFiatCurrency
                 let rates = appState.cachedFXRates
                 
-                let owedFiat = CurrencyManager.convertCRBToFiat(baseUnits: miner.owed, priceUSDT: price, rates: rates, targetCurrency: currency).map {
+                let owedFiat = CurrencyManager.convertCRBToFiat(baseUnits: owed, priceUSDT: price, rates: rates, targetCurrency: currency).map {
                     "≈ " + CurrencyManager.formatFiat($0, currencyCode: currency)
                 }
-                let paidFiat = CurrencyManager.convertCRBToFiat(baseUnits: miner.paid, priceUSDT: price, rates: rates, targetCurrency: currency).map {
+                let paidFiat = CurrencyManager.convertCRBToFiat(baseUnits: paid, priceUSDT: price, rates: rates, targetCurrency: currency).map {
                     "≈ " + CurrencyManager.formatFiat($0, currencyCode: currency)
                 }
-                let earnedFiat = CurrencyManager.convertCRBToFiat(baseUnits: miner.earned, priceUSDT: price, rates: rates, targetCurrency: currency).map {
+                let earnedFiat = CurrencyManager.convertCRBToFiat(baseUnits: earned, priceUSDT: price, rates: rates, targetCurrency: currency).map {
                     "≈ " + CurrencyManager.formatFiat($0, currencyCode: currency)
                 }
                 
@@ -110,10 +138,10 @@ struct MiningDashboardView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible()),
                 ], spacing: CRBTheme.Spacing.md) {
-                    StatCard(icon: "banknote", label: "Owed".localized, value: CRBUnits.formatCRBCompact(miner.owed), color: CRBTheme.Colors.warning, subtitle: owedFiat)
-                    StatCard(icon: "checkmark.circle", label: "Paid".localized, value: CRBUnits.formatCRBCompact(miner.paid), color: CRBTheme.Colors.buyGreen, subtitle: paidFiat)
-                    StatCard(icon: "chart.line.uptrend.xyaxis", label: "Earned".localized, value: CRBUnits.formatCRBCompact(miner.earned), color: CRBTheme.Colors.cyan, subtitle: earnedFiat)
-                    StatCard(icon: "square.stack.3d.up", label: "Shares".localized, value: String(format: "%.0f", miner.shares), color: CRBTheme.Colors.violet)
+                    StatCard(icon: "banknote", label: "Owed".localized, value: CRBUnits.formatCRBCompact(owed), color: CRBTheme.Colors.warning, subtitle: owedFiat)
+                    StatCard(icon: "checkmark.circle", label: "Paid".localized, value: CRBUnits.formatCRBCompact(paid), color: CRBTheme.Colors.buyGreen, subtitle: paidFiat)
+                    StatCard(icon: "chart.line.uptrend.xyaxis", label: "Earned".localized, value: CRBUnits.formatCRBCompact(earned), color: CRBTheme.Colors.cyan, subtitle: earnedFiat)
+                    StatCard(icon: "square.stack.3d.up", label: "Shares".localized, value: String(format: "%.0f", shares), color: CRBTheme.Colors.violet)
                 }
             } else {
                 // Not mining
@@ -139,6 +167,168 @@ struct MiningDashboardView: View {
             }
         }
         .glassCard()
+    }
+
+    // MARK: - Profit Calculator
+
+    private var profitCalculatorSection: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            SectionHeader(title: "Profit Calculator".localized, icon: "function")
+
+            VStack(spacing: CRBTheme.Spacing.md) {
+                HStack(spacing: CRBTheme.Spacing.md) {
+                    calculatorInput(
+                        "Hashrate".localized,
+                        text: $calculatorHashrate,
+                        placeholder: currentHashratePlaceholder,
+                        keyboard: .decimalPad
+                    )
+
+                    VStack(alignment: .leading, spacing: CRBTheme.Spacing.xs) {
+                        Text("Unit".localized)
+                            .font(CRBTheme.Typography.caption())
+                            .foregroundColor(CRBTheme.Colors.muted)
+
+                        Picker("Unit".localized, selection: $calculatorUnit) {
+                            ForEach(MiningHashrateUnit.allCases) { unit in
+                                Text(unit.rawValue).tag(unit)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(CRBTheme.Colors.cyan)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(CRBTheme.Spacing.md)
+                        .background(CRBTheme.Colors.backgroundSecondary)
+                        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+                    }
+                }
+
+                HStack(spacing: CRBTheme.Spacing.md) {
+                    calculatorInput(
+                        "Power".localized,
+                        text: $calculatorPowerWatts,
+                        placeholder: "120 W",
+                        keyboard: .decimalPad
+                    )
+
+                    calculatorInput(
+                        "Electricity".localized,
+                        text: $calculatorElectricityPrice,
+                        placeholder: "\(appState.selectedFiatCurrency)/kWh",
+                        keyboard: .decimalPad
+                    )
+                }
+            }
+
+            if let estimate = miningProfitEstimate {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: CRBTheme.Spacing.md) {
+                    StatCard(icon: "calendar", label: "Pool CRB / Day".localized, value: "\(CRBUnits.formatDecimal(estimate.poolDailyCRB, maxFractionDigits: 8, minFractionDigits: 2)) CRB", color: CRBTheme.Colors.cyan)
+                    StatCard(icon: "dice", label: "Solo Expected".localized, value: "\(CRBUnits.formatDecimal(estimate.soloDailyCRB, maxFractionDigits: 8, minFractionDigits: 2)) CRB", color: CRBTheme.Colors.violet, subtitle: "\(CRBUnits.formatDecimal(estimate.soloBlocksPerDay, maxFractionDigits: 6, minFractionDigits: 0)) " + "blocks/day".localized)
+                    StatCard(
+                        icon: "dollarsign.circle",
+                        label: "Revenue / Day".localized,
+                        value: CurrencyManager.formatFiat(estimate.dailyRevenueFiat, currencyCode: appState.selectedFiatCurrency),
+                        color: CRBTheme.Colors.buyGreen
+                    )
+                    StatCard(icon: "bolt.fill", label: "Power / Day".localized, value: CurrencyManager.formatFiat(estimate.dailyPowerCostFiat, currencyCode: appState.selectedFiatCurrency), color: CRBTheme.Colors.warning)
+                    StatCard(
+                        icon: "chart.line.uptrend.xyaxis",
+                        label: "Profit / Day".localized,
+                        value: CurrencyManager.formatFiat(estimate.dailyProfitFiat, currencyCode: appState.selectedFiatCurrency),
+                        color: estimate.dailyProfitFiat >= 0 ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.sellRed,
+                        subtitle: "\(CurrencyManager.formatFiat(estimate.monthlyProfitFiat, currencyCode: appState.selectedFiatCurrency)) / " + "Month".localized
+                    )
+                }
+
+                HStack(spacing: CRBTheme.Spacing.sm) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(CRBTheme.Colors.muted)
+                    Text(estimate.sourceNote.localized)
+                        .font(.system(size: 11))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                }
+            } else {
+                Text("Enter hashrate and wait for live chain price data to estimate mining profit.".localized)
+                    .font(CRBTheme.Typography.body())
+                    .foregroundColor(CRBTheme.Colors.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(CRBTheme.Spacing.md)
+                    .background(CRBTheme.Colors.backgroundSecondary.opacity(0.45))
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            }
+        }
+        .glassCard()
+    }
+
+    private var currentHashratePlaceholder: String {
+        let hashrate = viewModel.totalHashrate > 0 ? viewModel.totalHashrate : (viewModel.myMiner?.hashrate ?? 0)
+        guard hashrate > 0 else { return "100" }
+        return CRBUnits.formatDecimal(Decimal(string: String(hashrate / calculatorUnit.multiplier)) ?? 0, maxFractionDigits: 2, minFractionDigits: 0)
+    }
+
+    private var miningProfitEstimate: MiningProfitEstimate? {
+        let fallbackHashrate = viewModel.totalHashrate > 0 ? viewModel.totalHashrate : (viewModel.myMiner?.hashrate ?? 0)
+        let enteredHashrate = Decimal(string: calculatorHashrate.trimmingCharacters(in: .whitespacesAndNewlines))
+        let hashrateDecimal = (enteredHashrate ?? (fallbackHashrate > 0 ? Decimal(string: String(fallbackHashrate / calculatorUnit.multiplier)) : nil))
+        guard let hashrateDecimal, hashrateDecimal > 0 else { return nil }
+
+        guard let networkHashrate = appState.chainStatus?.hashrate, networkHashrate > 0 else { return nil }
+        let networkHashrateDecimal = Decimal(string: String(networkHashrate)) ?? 0
+        guard networkHashrateDecimal > 0 else { return nil }
+
+        let minerHashrate = hashrateDecimal * (Decimal(string: String(calculatorUnit.multiplier)) ?? 1)
+        let blockReward = appState.p2pStats?.block_reward_crb ?? appState.chainStatus.map { CRBUnits.toDisplayCRB($0.reward) } ?? 0
+        let blockTime = Decimal(appState.p2pStats?.block_time_secs ?? 60)
+        let priceUSDT = appState.cachedCRBPriceUSDT
+        let fiatRate = appState.cachedFXRates[appState.selectedFiatCurrency] ?? CurrencyManager.fallbackRates[appState.selectedFiatCurrency] ?? 1
+        let powerWatts = Decimal(string: calculatorPowerWatts.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let electricityPrice = Decimal(string: calculatorElectricityPrice.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+
+        guard blockReward > 0, blockTime > 0, priceUSDT > 0 else { return nil }
+
+        let poolFeePermil = Decimal(viewModel.poolStats?.fee_permil ?? 0)
+        let poolFeeRate = max(0, min(poolFeePermil / 1000, 1))
+        let blocksPerDay = Decimal(86_400) / blockTime
+        let soloBlocksPerDay = (minerHashrate / networkHashrateDecimal) * blocksPerDay
+        let soloDailyCRB = soloBlocksPerDay * blockReward
+        let poolDailyCRB = soloDailyCRB * (1 - poolFeeRate)
+        let dailyRevenueFiat = poolDailyCRB * priceUSDT * fiatRate
+        let dailyPowerCostFiat = (powerWatts * 24 / 1000) * electricityPrice
+        let dailyProfitFiat = dailyRevenueFiat - dailyPowerCostFiat
+        let monthlyProfitFiat = dailyProfitFiat * 30
+
+        return MiningProfitEstimate(
+            poolDailyCRB: max(poolDailyCRB, 0),
+            soloDailyCRB: max(soloDailyCRB, 0),
+            soloBlocksPerDay: max(soloBlocksPerDay, 0),
+            dailyRevenueFiat: dailyRevenueFiat,
+            dailyPowerCostFiat: dailyPowerCostFiat,
+            dailyProfitFiat: dailyProfitFiat,
+            monthlyProfitFiat: monthlyProfitFiat,
+            sourceNote: "Estimate follows the pool calculator: your hashrate divided by live network hashrate, multiplied by blocks per day and block reward. Pool revenue subtracts pool fee; solo is expected value."
+        )
+    }
+
+    private func calculatorInput(_ label: String, text: Binding<String>, placeholder: String, keyboard: UIKeyboardType) -> some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.xs) {
+            Text(label)
+                .font(CRBTheme.Typography.caption())
+                .foregroundColor(CRBTheme.Colors.muted)
+
+            TextField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .keyboardType(keyboard)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(CRBTheme.Colors.ink)
+                .padding(CRBTheme.Spacing.md)
+                .background(CRBTheme.Colors.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+        }
     }
     
     // MARK: - Workers
@@ -269,6 +459,39 @@ struct MiningDashboardView: View {
         }
         .glassCard()
     }
+}
+
+enum MiningHashrateUnit: String, CaseIterable, Identifiable {
+    case hash = "H/s"
+    case kilo = "kH/s"
+    case mega = "MH/s"
+    case giga = "GH/s"
+
+    var id: String { rawValue }
+
+    var multiplier: Double {
+        switch self {
+        case .hash:
+            return 1
+        case .kilo:
+            return 1_000
+        case .mega:
+            return 1_000_000
+        case .giga:
+            return 1_000_000_000
+        }
+    }
+}
+
+struct MiningProfitEstimate {
+    let poolDailyCRB: Decimal
+    let soloDailyCRB: Decimal
+    let soloBlocksPerDay: Decimal
+    let dailyRevenueFiat: Decimal
+    let dailyPowerCostFiat: Decimal
+    let dailyProfitFiat: Decimal
+    let monthlyProfitFiat: Decimal
+    let sourceNote: String
 }
 
 #Preview {

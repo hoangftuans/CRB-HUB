@@ -1,4 +1,4 @@
-/* EN Localizable.strings (Updated with Donation) */
+/* EN Localizable.strings */
 
 "%1$d/64 characters" = "%1$d/64 characters";
 "24h Change" = "24h Change";
@@ -88,7 +88,6 @@
 "I have backed up my private key" = "I have backed up my private key";
 "I understand that losing this key means losing my CRB forever" = "I understand that losing this key means losing my CRB forever";
 "Idle" = "Idle";
-"If you find CRB Hub helpful, please consider supporting the developer by donating some CRB." = "If you find CRB Hub helpful, please consider supporting the developer by donating some CRB.";
 "If you lose this key, you lose access to your wallet permanently. No one can recover it." = "If you lose this key, you lose access to your wallet permanently. No one can recover it.";
 "If you lose this key, you lose your funds forever. Store it securely offline." = "If you lose this key, you lose your funds forever. Store it securely offline.";
 "If you lose your private key, your CRB is gone forever. No one can recover it — not even us." = "If you lose your private key, your CRB is gone forever. No one can recover it — not even us.";
@@ -194,7 +193,6 @@
 "Spendable" = "Spendable";
 "Start Using CRB Hub" = "Start Using CRB Hub";
 "Success" = "Success";
-"Support Developer" = "Support Developer";
 "This is the ONLY way to recover your wallet" = "This is the ONLY way to recover your wallet";
 "This will permanently delete this wallet from this device. Make sure you have backed up your private key." = "This will permanently delete this wallet from this device. Make sure you have backed up your private key.";
 "Ticker" = "Ticker";
@@ -350,3 +348,41 @@
 "Sign the challenge with your ed25519 key" = "Sign the challenge with your ed25519 key";
 "Send signature to get a session token" = "Send signature to get a session token";
 "Token is held in memory only — no persistence" = "Token is held in memory only — no persistence";
+"Support CRB Hub" = "Support CRB Hub";
+"Optional App Store tips help support ongoing development. Tips do not unlock features or change wallet functionality." = "Optional App Store tips help support ongoing development. Tips do not unlock features or change wallet functionality.";
+"Loading support options..." = "Loading support options...";
+"Support tips are not available yet." = "Support tips are not available yet.";
+"Thank you for supporting CRB Hub." = "Thank you for supporting CRB Hub.";
+"Purchase is pending approval." = "Purchase is pending approval.";
+"Purchase could not be completed." = "Purchase could not be completed.";
+"The purchase could not be verified." = "The purchase could not be verified.";
+"SafeTrade Withdraw Verification" = "SafeTrade Withdraw Verification";
+"Generate an email code first, then enter any codes required by your SafeTrade account before sending." = "Generate an email code first, then enter any codes required by your SafeTrade account before sending.";
+"Generating code..." = "Generating code...";
+"Generate Email Code" = "Generate Email Code";
+"Email Code" = "Email Code";
+"Optional if SafeTrade does not require it" = "Optional if SafeTrade does not require it";
+"Authenticator Code" = "Authenticator Code";
+"Phone Code" = "Phone Code";
+"Email code sent by SafeTrade." = "Email code sent by SafeTrade.";
+"Only Polygon and Solana USDT wallets are supported for P2P." = "Only Polygon and Solana USDT wallets are supported for P2P.";
+"Profit Calculator" = "Profit Calculator";
+"Unit" = "Unit";
+"Power" = "Power";
+"Electricity" = "Electricity";
+"Pool CRB / Day" = "Pool CRB / Day";
+"Solo Expected" = "Solo Expected";
+"blocks/day" = "blocks/day";
+"Revenue / Day" = "Revenue / Day";
+"Power / Day" = "Power / Day";
+"Profit / Day" = "Profit / Day";
+"Month" = "Month";
+"Enter hashrate and wait for live chain price data to estimate mining profit." = "Enter hashrate and wait for live chain price data to estimate mining profit.";
+"Estimate follows the pool calculator: your hashrate divided by live network hashrate, multiplied by blocks per day and block reward. Pool revenue subtracts pool fee; solo is expected value." = "Estimate follows the pool calculator: your hashrate divided by live network hashrate, multiplied by blocks per day and block reward. Pool revenue subtracts pool fee; solo is expected value.";
+"Donate Tips" = "Donate Tips";
+"If CRB Hub is useful, you can optionally send a CRB or USDT tip to support development. Tips do not unlock features or change wallet behavior." = "If CRB Hub is useful, you can optionally send a CRB or USDT tip to support development. Tips do not unlock features or change wallet behavior.";
+"Crypto tip addresses are not configured yet." = "Crypto tip addresses are not configured yet.";
+"Tip address copied." = "Tip address copied.";
+"Cereblix" = "Cereblix";
+"Send USDT" = "Send USDT";
+"No matching USDT wallet" = "No matching USDT wallet";

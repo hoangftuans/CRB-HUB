@@ -149,21 +149,42 @@ final class SafeTradeAPIService {
         }
     }
 
-    func transferUSDT(wallet: USDTWallet, to recipient: String, amount: Decimal) async throws -> String {
+    func generateWithdrawCode(wallet: USDTWallet, to recipient: String, amount: Decimal, type: SafeTradeWithdrawCodeType = .email) async throws {
+        guard isEnabled else {
+            throw SafeTradeError.notConfigured
+        }
+
+        let requestBody = SafeTradeGenerateWithdrawCodeRequest(
+            address: recipient,
+            amount: amount,
+            blockchainKey: wallet.network.safeTradeBlockchainKey,
+            currency: "usdt",
+            type: type.rawValue
+        )
+
+        let _: SafeTradeGenerateWithdrawCodeResponse = try await request(
+            path: settings.normalized.generateWithdrawCodePath,
+            method: "POST",
+            queryItems: [],
+            body: requestBody
+        )
+    }
+
+    func transferUSDT(wallet: USDTWallet, to recipient: String, amount: Decimal, codes: SafeTradeWithdrawCodes = SafeTradeWithdrawCodes()) async throws -> String {
         guard isEnabled else {
             throw SafeTradeError.notConfigured
         }
 
         let requestBody = SafeTradeTransferRequest(
             address: recipient,
-            amount: CRBUnits.formatDecimal(amount, maxFractionDigits: 6, minFractionDigits: 0),
+            amount: amount,
             beneficiaryId: nil,
             blockchainKey: wallet.network.safeTradeBlockchainKey,
             currency: "usdt",
-            emailCode: nil,
+            emailCode: codes.emailCode.nilIfBlank,
             note: "CRB Hub USDT transfer",
-            otpCode: nil,
-            phoneCode: nil
+            otpCode: codes.otpCode.nilIfBlank,
+            phoneCode: codes.phoneCode.nilIfBlank
         )
 
         let response: SafeTradeTransferResponse = try await request(
@@ -266,9 +287,48 @@ final class SafeTradeAPIService {
         var statusPath: String
         var balancePath: String
         var transferPath: String
+        var generateWithdrawCodePath: String
         var p2pPath: String
         var lastTestedAt: Date?
         var lastTestStatus: String?
+
+        init(
+            isEnabled: Bool,
+            baseURL: String,
+            apiKey: String,
+            statusPath: String,
+            balancePath: String,
+            transferPath: String,
+            generateWithdrawCodePath: String = "trade/account/withdraws/generate_code",
+            p2pPath: String,
+            lastTestedAt: Date?,
+            lastTestStatus: String?
+        ) {
+            self.isEnabled = isEnabled
+            self.baseURL = baseURL
+            self.apiKey = apiKey
+            self.statusPath = statusPath
+            self.balancePath = balancePath
+            self.transferPath = transferPath
+            self.generateWithdrawCodePath = generateWithdrawCodePath
+            self.p2pPath = p2pPath
+            self.lastTestedAt = lastTestedAt
+            self.lastTestStatus = lastTestStatus
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+            baseURL = try container.decode(String.self, forKey: .baseURL)
+            apiKey = try container.decode(String.self, forKey: .apiKey)
+            statusPath = try container.decode(String.self, forKey: .statusPath)
+            balancePath = try container.decode(String.self, forKey: .balancePath)
+            transferPath = try container.decode(String.self, forKey: .transferPath)
+            generateWithdrawCodePath = (try? container.decode(String.self, forKey: .generateWithdrawCodePath)) ?? "trade/account/withdraws/generate_code"
+            p2pPath = try container.decode(String.self, forKey: .p2pPath)
+            lastTestedAt = try? container.decodeIfPresent(Date.self, forKey: .lastTestedAt)
+            lastTestStatus = try? container.decodeIfPresent(String.self, forKey: .lastTestStatus)
+        }
 
         static let `default` = Settings(
             isEnabled: false,
@@ -277,6 +337,7 @@ final class SafeTradeAPIService {
             statusPath: "trade/account/members/me",
             balancePath: "trade/account/balances/spot",
             transferPath: "trade/account/withdraws",
+            generateWithdrawCodePath: "trade/account/withdraws/generate_code",
             p2pPath: "trade/market/orders",
             lastTestedAt: nil,
             lastTestStatus: nil
@@ -292,6 +353,7 @@ final class SafeTradeAPIService {
             copy.statusPath = normalizePath(copy.statusPath, fallback: "trade/account/members/me")
             copy.balancePath = normalizePath(copy.balancePath, fallback: "trade/account/balances/spot")
             copy.transferPath = normalizePath(copy.transferPath, fallback: "trade/account/withdraws")
+            copy.generateWithdrawCodePath = normalizePath(copy.generateWithdrawCodePath, fallback: "trade/account/withdraws/generate_code")
             copy.p2pPath = normalizePath(copy.p2pPath, fallback: "trade/market/orders")
             if copy.statusPath == "status" {
                 copy.statusPath = "trade/account/members/me"
@@ -301,6 +363,9 @@ final class SafeTradeAPIService {
             }
             if copy.transferPath == "wallet/withdraw" {
                 copy.transferPath = "trade/account/withdraws"
+            }
+            if copy.generateWithdrawCodePath == "wallet/withdraw/generate_code" {
+                copy.generateWithdrawCodePath = "trade/account/withdraws/generate_code"
             }
             if copy.p2pPath == "p2p/trade" {
                 copy.p2pPath = "trade/market/orders"
@@ -328,6 +393,10 @@ final class SafeTradeAPIService {
             case .invalidURL:
                 return "Invalid SafeTrade API URL."
             case .server(let code, let message):
+                let cleanMessage = (message ?? "").lowercased()
+                if code == 422, cleanMessage.contains("apikey") || cleanMessage.contains("api key") {
+                    return "SafeTrade API key is invalid or does not have withdrawal permission. Create a new API key with withdraw access, then reconnect SafeTrade."
+                }
                 return "SafeTrade API error \(code): \(message ?? "Unknown error")"
             case .decoding(let error):
                 return "SafeTrade response parsing failed: \(error.localizedDescription)"
@@ -422,7 +491,7 @@ private struct SafeTradeSpotBalanceResponse: Decodable {
 
 private struct SafeTradeTransferRequest: Encodable {
     let address: String
-    let amount: String
+    let amount: Decimal
     let beneficiaryId: Int?
     let blockchainKey: String
     let currency: String
@@ -444,6 +513,26 @@ private struct SafeTradeTransferRequest: Encodable {
     }
 }
 
+private struct SafeTradeGenerateWithdrawCodeRequest: Encodable {
+    let address: String
+    let amount: Decimal
+    let blockchainKey: String
+    let currency: String
+    let type: String
+
+    enum CodingKeys: String, CodingKey {
+        case address
+        case amount
+        case blockchainKey = "blockchain_key"
+        case currency
+        case type
+    }
+}
+
+private struct SafeTradeGenerateWithdrawCodeResponse: Decodable {
+    let status: Int?
+}
+
 private struct SafeTradeTransferResponse: Decodable {
     let txid: String?
     let id: Int?
@@ -459,8 +548,47 @@ private struct SafeTradeErrorResponse: Decodable {
     let error: String?
     let message: String?
     let errors: [String]?
+    let fieldErrors: [String: [String]]?
+    let stringFieldErrors: [String: String]?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        error = try? container.decodeIfPresent(String.self, forKey: .error)
+        message = try? container.decodeIfPresent(String.self, forKey: .message)
+        errors = try? container.decodeIfPresent([String].self, forKey: .errors)
+        fieldErrors = try? container.decodeIfPresent([String: [String]].self, forKey: .errors)
+        stringFieldErrors = try? container.decodeIfPresent([String: String].self, forKey: .errors)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case error
+        case message
+        case errors
+    }
 
     var displayMessage: String? {
-        message ?? error ?? errors?.joined(separator: ", ")
+        if let message { return message }
+        if let error { return error }
+        if let errors, !errors.isEmpty { return errors.joined(separator: ", ") }
+        if let fieldErrors, !fieldErrors.isEmpty {
+            return fieldErrors
+                .map { "\($0.key): \($0.value.joined(separator: ", "))" }
+                .sorted()
+                .joined(separator: "; ")
+        }
+        if let stringFieldErrors, !stringFieldErrors.isEmpty {
+            return stringFieldErrors
+                .map { "\($0.key): \($0.value)" }
+                .sorted()
+                .joined(separator: "; ")
+        }
+        return nil
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        let clean = trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? nil : clean
     }
 }

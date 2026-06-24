@@ -5,6 +5,7 @@ struct USDTTransferService {
         wallet: USDTWallet,
         to recipient: String,
         amount: Decimal,
+        safeTradeCodes: SafeTradeWithdrawCodes = SafeTradeWithdrawCodes(),
         fallbackPassword: String? = nil
     ) async throws -> String {
         guard USDTNetwork.isValidP2PAddress(recipient, rail: wallet.network.p2pRail ?? "") || isValidAddress(recipient, network: wallet.network) else {
@@ -24,7 +25,7 @@ struct USDTTransferService {
             } else {
                 try await authenticateSafeTradeTransfer(amount: amount, fallbackPassword: fallbackPassword)
             }
-            return try await SafeTradeAPIService.shared.transferUSDT(wallet: wallet, to: recipient, amount: amount)
+            return try await SafeTradeAPIService.shared.transferUSDT(wallet: wallet, to: recipient, amount: amount, codes: safeTradeCodes)
         }
 
         if wallet.isNative {
