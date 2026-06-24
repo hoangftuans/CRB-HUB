@@ -28,6 +28,12 @@ final class SafeTradeAPIService {
         (try? loadAPIKey()) ?? settings.apiKey
     }
 
+    var requiresBiometricReconnect: Bool {
+        let storedSettings = loadStoredSettings()
+        return storedSettings.isEnabled &&
+            (try? keychain.loadGenericSecret(account: configuredAccount)) == nil
+    }
+
     var isEnabled: Bool {
         guard settings.isEnabled,
               let apiKey = try? loadAPIKey(),

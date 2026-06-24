@@ -348,6 +348,10 @@ struct SettingsView: View {
 
             Divider().background(CRBTheme.Colors.cardBorder)
 
+            securityStatusGrid
+
+            Divider().background(CRBTheme.Colors.cardBorder)
+
             VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                 securityItem("Private keys stored in iOS Keychain".localized)
                 securityItem("Keys never leave your device".localized)
@@ -359,6 +363,69 @@ struct SettingsView: View {
             }
         }
         .glassCard()
+    }
+
+    private var securityStatusGrid: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: CRBTheme.Spacing.sm) {
+            securityStatusPill(
+                "Biometrics".localized,
+                value: KeychainStore.shared.isBiometricsAvailable() ? "Ready".localized : "Unavailable".localized,
+                icon: "faceid",
+                isGood: KeychainStore.shared.isBiometricsAvailable()
+            )
+            securityStatusPill(
+                "App Lock".localized,
+                value: "Enabled".localized,
+                icon: "lock.shield.fill",
+                isGood: true
+            )
+            securityStatusPill(
+                "Wallet Password".localized,
+                value: WalletSecurityStore.shared.isPasswordEnabled ? "Enabled".localized : "Optional".localized,
+                icon: "key.fill",
+                isGood: WalletSecurityStore.shared.isPasswordEnabled
+            )
+            securityStatusPill(
+                "SafeTrade".localized,
+                value: SafeTradeAPIService.shared.isEnabled ? "Protected".localized : (SafeTradeAPIService.shared.requiresBiometricReconnect ? "Reconnect".localized : "Off".localized),
+                icon: "server.rack",
+                isGood: SafeTradeAPIService.shared.isEnabled
+            )
+            securityStatusPill(
+                "Node".localized,
+                value: appState.nodeURLWarning == nil ? "Official".localized : "Custom".localized,
+                icon: "network",
+                isGood: appState.nodeURLWarning == nil
+            )
+        }
+    }
+
+    private func securityStatusPill(_ title: String, value: String, icon: String, isGood: Bool) -> some View {
+        HStack(spacing: CRBTheme.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(isGood ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.warning)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(CRBTheme.Colors.muted)
+                Text(value)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(CRBTheme.Colors.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(CRBTheme.Spacing.sm)
+        .background((isGood ? CRBTheme.Colors.buyGreen : CRBTheme.Colors.warning).opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
     }
 
     private var walletPasswordSection: some View {
@@ -615,10 +682,20 @@ struct SettingsView: View {
                 .font(.system(size: 13))
                 .foregroundColor(CRBTheme.Colors.muted)
 
+            if SafeTradeAPIService.shared.requiresBiometricReconnect {
+                Label("Security update: reconnect SafeTrade once so the API secret can be stored with biometric Keychain protection.".localized, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(CRBTheme.Colors.warning)
+                    .padding(CRBTheme.Spacing.md)
+                    .background(CRBTheme.Colors.warning.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            }
+
             HStack {
-                Label(settings.isEnabled ? "Connected".localized : "Not Connected".localized, systemImage: settings.isEnabled ? "checkmark.circle.fill" : "xmark.circle")
+                let isConnected = SafeTradeAPIService.shared.isEnabled
+                Label(isConnected ? "Connected".localized : "Not Connected".localized, systemImage: isConnected ? "checkmark.circle.fill" : "xmark.circle")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(settings.isEnabled ? CRBTheme.Colors.success : CRBTheme.Colors.muted)
+                    .foregroundColor(isConnected ? CRBTheme.Colors.success : CRBTheme.Colors.muted)
                 Spacer()
                 Text(settings.baseURL)
                     .font(.system(size: 11, design: .monospaced))

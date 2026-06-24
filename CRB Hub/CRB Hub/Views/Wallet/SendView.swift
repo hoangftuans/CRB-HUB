@@ -14,6 +14,7 @@ struct SendView: View {
     @State private var sendResult: BroadcastResult?
     @State private var fallbackPassword = ""
     @State private var requiresPassword = false
+    @State private var showFinalConfirmation = false
     @State private var walletViewModel = WalletViewModel()
     
     init(prefilledAddress: String = "", prefilledAmount: String? = nil) {
@@ -28,7 +29,10 @@ struct SendView: View {
     }
     
     var parsedAmount: Decimal? {
-        guard let val = Decimal(string: amountString), val > 0 else { return nil }
+        let clean = amountString
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        guard let val = Decimal(string: clean), val > 0 else { return nil }
         return val
     }
     
@@ -257,14 +261,26 @@ struct SendView: View {
             }
             
             GradientButton(
-                title: isSending ? "Sending...".localized : "Send CRB".localized,
+                title: isSending ? "Sending...".localized : "Review & Send CRB".localized,
                 icon: "paperplane.fill",
                 isDisabled: !canSend
             ) {
+                showFinalConfirmation = true
+            }
+        }
+        .confirmationDialog(
+            "Confirm CRB Transfer".localized,
+            isPresented: $showFinalConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Confirm & Authenticate".localized) {
                 Task {
                     await sendCRB()
                 }
             }
+            Button("Cancel".localized, role: .cancel) {}
+        } message: {
+            Text(finalConfirmationMessage)
         }
     }
     
@@ -308,6 +324,23 @@ struct SendView: View {
     }
     
     // MARK: - Actions
+
+    private var finalConfirmationMessage: String {
+        let source = appState.selectedWallet?.address ?? ""
+        let recipient = recipientAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        let amount = baseUnitAmount.map { CRBUnits.formatCRB($0, maxFractionDigits: 8, minFractionDigits: 0) } ?? amountString
+        let fee = CRBUnits.formatCRB(feeSuggested, maxFractionDigits: 8, minFractionDigits: 8)
+        let total = CRBUnits.formatCRB(totalCost, maxFractionDigits: 8, minFractionDigits: 2)
+        let node = APIConfig.baseURL == APIConfig.officialBaseURL ? "Official Cereblix node" : "Custom node: \(APIConfig.baseURL)"
+        return """
+        From: \(AddressValidator.truncatedAddress(source, leading: 10, trailing: 8))
+        To: \(AddressValidator.truncatedAddress(recipient, leading: 10, trailing: 8))
+        Amount: \(amount) CRB
+        Fee: \(fee) CRB
+        Total: \(total) CRB
+        Network: \(node)
+        """
+    }
     
     private func loadData() async {
         isLoading = true

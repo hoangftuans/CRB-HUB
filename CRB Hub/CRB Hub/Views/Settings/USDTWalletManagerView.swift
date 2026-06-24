@@ -532,6 +532,7 @@ struct SendUSDTSheet: View {
     @State private var requiresPassword = false
     @State private var isSending = false
     @State private var isGeneratingCode = false
+    @State private var showFinalConfirmation = false
     @State private var error: String?
     @State private var codeMessage: String?
 
@@ -582,11 +583,15 @@ struct SendUSDTSheet: View {
                         }
 
                         GradientButton(
-                            title: isSending ? "Sending...".localized : (requiresPassword ? "Unlock & Send".localized : "Send USDT".localized),
+                            title: isSending ? "Sending...".localized : (requiresPassword ? "Unlock & Review".localized : "Review & Send USDT".localized),
                             icon: "paperplane.fill",
                             isDisabled: isSending || isGeneratingCode || recipient.isEmpty || amount.isEmpty || (requiresPassword && password.isEmpty)
                         ) {
-                            send()
+                            guard parseDecimal(amount) != nil else {
+                                error = "Invalid USDT amount"
+                                return
+                            }
+                            showFinalConfirmation = true
                         }
 
                         Text("Face ID is required before USDT transfers. Native wallets still require protected key access; SafeTrade withdrawals unlock the API secret from Keychain.".localized)
@@ -607,6 +612,30 @@ struct SendUSDTSheet: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Confirm USDT Transfer".localized,
+            isPresented: $showFinalConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Confirm & Authenticate".localized) {
+                send()
+            }
+            Button("Cancel".localized, role: .cancel) {}
+        } message: {
+            Text(finalConfirmationMessage)
+        }
+    }
+
+    private var finalConfirmationMessage: String {
+        let amountValue = parseDecimal(amount).map { CRBUnits.formatDecimal($0, maxFractionDigits: 6, minFractionDigits: 0) } ?? amount
+        return """
+        From: \(wallet.name)
+        Provider: \(wallet.provider.rawValue)
+        Network: \(wallet.network.displayName)
+        To: \(AddressValidator.truncatedAddress(recipient.trimmingCharacters(in: .whitespacesAndNewlines), leading: 10, trailing: 8))
+        Amount: \(amountValue) USDT
+        Authorization: \(SafeTradeAPIService.shared.isEnabled ? "SafeTrade biometric Keychain secret" : "Native wallet signing")
+        """
     }
 
     private var safeTradeVerificationSection: some View {
