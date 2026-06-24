@@ -79,7 +79,6 @@ struct BackupWarningView: View {
                             Text(privateKeyHex)
                                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                                 .foregroundColor(CRBTheme.Colors.warning)
-                                .textSelection(.enabled)
                                 .padding(CRBTheme.Spacing.md)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(CRBTheme.Colors.warning.opacity(0.05))

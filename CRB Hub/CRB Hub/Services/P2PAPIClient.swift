@@ -94,7 +94,8 @@ enum P2PAPIClient {
     
     /// POST /otc/take — take an offer
     static func takeOffer(token: String, request: TakeOfferRequest) async throws -> P2PTrade {
-        try await APIClient.postAuth("\(APIConfig.p2pAPI)/take", token: token, body: request, type: P2PTrade.self)
+        guard validateId(request.offerID) else { throw CRBAPIError.badRequest("Invalid offer ID") }
+        return try await APIClient.postAuth("\(APIConfig.p2pAPI)/take", token: token, body: request, type: P2PTrade.self)
     }
     
     /// GET /otc/trade?id= — trade detail
@@ -115,18 +116,21 @@ enum P2PAPIClient {
     
     /// POST /otc/trade/ready
     static func tradeReady(token: String, tradeId: String) async throws {
+        guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
         struct ReadyRequest: Codable { let id: String }
         try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/trade/ready", token: token, body: ReadyRequest(id: tradeId))
     }
     
     /// POST /otc/trade/cancel
     static func tradeCancel(token: String, tradeId: String) async throws {
+        guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
         struct CancelRequest: Codable { let id: String }
         try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/trade/cancel", token: token, body: CancelRequest(id: tradeId))
     }
     
     /// POST /otc/trade/appeal
     static func tradeAppeal(token: String, tradeId: String, category: String) async throws {
+        guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
         struct AppealRequest: Codable { let id: String; let category: String }
         try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/trade/appeal", token: token, body: AppealRequest(id: tradeId, category: category))
     }
@@ -139,12 +143,14 @@ enum P2PAPIClient {
     
     /// POST /otc/trade/rate
     static func tradeRate(token: String, tradeId: String, up: Bool) async throws {
+        guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
         struct RateRequest: Codable { let id: String; let up: Bool }
         try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/trade/rate", token: token, body: RateRequest(id: tradeId, up: up))
     }
     
     /// GET /otc/chat?id= — read trade chat
     static func getChat(token: String, tradeId: String) async throws -> [P2PChatMessage] {
+        guard validateId(tradeId) else { throw CRBAPIError.badRequest("Invalid trade ID") }
         let url = try APIClient.makeURL(
             base: APIConfig.p2pAPI,
             path: "chat",
@@ -164,12 +170,14 @@ enum P2PAPIClient {
     
     /// POST /otc/block
     static func blockUser(token: String, id: String) async throws {
+        guard validateId(id) else { throw CRBAPIError.badRequest("Invalid user ID") }
         struct BlockRequest: Codable { let id: String }
         try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/block", token: token, body: BlockRequest(id: id))
     }
     
     /// POST /otc/unblock
     static func unblockUser(token: String, id: String) async throws {
+        guard validateId(id) else { throw CRBAPIError.badRequest("Invalid user ID") }
         struct UnblockRequest: Codable { let id: String }
         try await APIClient.postAuthSimple("\(APIConfig.p2pAPI)/unblock", token: token, body: UnblockRequest(id: id))
     }

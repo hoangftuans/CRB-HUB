@@ -8,11 +8,24 @@ enum CereblixAPIClient {
     static func getStatus() async throws -> ChainStatus {
         try await APIClient.get("\(APIConfig.walletAPI)/status", type: ChainStatus.self)
     }
+
+    static func getStatus(baseURL: String) async throws -> ChainStatus {
+        try await APIClient.get("\(baseURL)/api/status", type: ChainStatus.self)
+    }
     
     /// GET /api/balance?addr=crb1... — balance and account info
     static func getBalance(address: String) async throws -> BalanceResponse {
         let url = try APIClient.makeURL(
             base: APIConfig.walletAPI,
+            path: "balance",
+            queryItems: [URLQueryItem(name: "addr", value: address)]
+        )
+        return try await APIClient.get(url, type: BalanceResponse.self)
+    }
+
+    static func getBalance(address: String, baseURL: String) async throws -> BalanceResponse {
+        let url = try APIClient.makeURL(
+            base: "\(baseURL)/api",
             path: "balance",
             queryItems: [URLQueryItem(name: "addr", value: address)]
         )

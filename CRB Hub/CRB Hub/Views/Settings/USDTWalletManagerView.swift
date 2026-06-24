@@ -589,7 +589,7 @@ struct SendUSDTSheet: View {
                             send()
                         }
 
-                        Text("Face ID is required before any USDT transfer. If Face ID fails, use your wallet password fallback.".localized)
+                        Text("Face ID is required before USDT transfers. Native wallets still require protected key access; SafeTrade withdrawals unlock the API secret from Keychain.".localized)
                             .font(.system(size: 11))
                             .foregroundColor(CRBTheme.Colors.muted)
                     }
@@ -670,7 +670,7 @@ struct SendUSDTSheet: View {
     }
 
     private func send() {
-        guard let amountDecimal = Decimal(string: amount), amountDecimal > 0 else {
+        guard let amountDecimal = parseDecimal(amount), amountDecimal > 0 else {
             error = "Invalid USDT amount"
             return
         }
@@ -703,7 +703,7 @@ struct SendUSDTSheet: View {
     }
 
     private func generateWithdrawCode() {
-        guard let amountDecimal = Decimal(string: amount), amountDecimal > 0 else {
+        guard let amountDecimal = parseDecimal(amount), amountDecimal > 0 else {
             error = "Invalid USDT amount"
             return
         }
@@ -726,6 +726,13 @@ struct SendUSDTSheet: View {
             }
             isGeneratingCode = false
         }
+    }
+
+    private func parseDecimal(_ value: String) -> Decimal? {
+        let clean = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        return Decimal(string: clean)
     }
 }
 

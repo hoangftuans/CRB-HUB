@@ -227,7 +227,11 @@ enum APIClient {
 }
 
 private final class PinnedURLSessionDelegate: NSObject, URLSessionDelegate {
-    private let pinnedLeafCertificateHashes: [String: Set<String>] = [
+    private let pinnedPublicKeyHashes: [String: Set<String>] = [
+        "cereblix.com": ["nu8h0e7KjZAP+twP4B/c9jaaE2ueB+62CmLw+JsDq28="]
+    ]
+
+    private let legacyLeafCertificateHashes: [String: Set<String>] = [
         "cereblix.com": ["3kRswfRe3GbqVKG96IqxkWOzKPYz1GjQy2XLO2qrzeQ="]
     ]
 
@@ -243,7 +247,7 @@ private final class PinnedURLSessionDelegate: NSObject, URLSessionDelegate {
         }
 
         let host = challenge.protectionSpace.host.lowercased()
-        guard let allowedHashes = pinnedLeafCertificateHashes[host] else {
+        guard let allowedPublicKeyHashes = pinnedPublicKeyHashes[host] else {
             completionHandler(.performDefaultHandling, nil)
             return
         }
@@ -256,14 +260,40 @@ private final class PinnedURLSessionDelegate: NSObject, URLSessionDelegate {
         }
 
         let leafCertificate = unsafeBitCast(CFArrayGetValueAtIndex(certificateChain, 0), to: SecCertificate.self)
-        let certificateData = SecCertificateCopyData(leafCertificate) as Data
-        let hash = Data(SHA256.hash(data: certificateData)).base64EncodedString()
+        if let publicKeyHash = publicKeyHash(for: leafCertificate),
+           allowedPublicKeyHashes.contains(publicKeyHash) {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+            return
+        }
 
-        guard allowedHashes.contains(hash) else {
+        let certificateData = SecCertificateCopyData(leafCertificate) as Data
+        let legacyLeafHash = Data(SHA256.hash(data: certificateData)).base64EncodedString()
+
+        guard legacyLeafCertificateHashes[host]?.contains(legacyLeafHash) == true else {
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
 
         completionHandler(.useCredential, URLCredential(trust: trust))
+    }
+
+    private func publicKeyHash(for certificate: SecCertificate) -> String? {
+        guard let publicKey = SecCertificateCopyKey(certificate),
+              let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
+            return nil
+        }
+
+        let attributes = SecKeyCopyAttributes(publicKey) as? [String: Any]
+        let keyType = attributes?[kSecAttrKeyType as String] as? String
+        let keySize = attributes?[kSecAttrKeySizeInBits as String] as? Int
+        let spkiData: Data
+
+        if keyType == (kSecAttrKeyTypeECSECPrimeRandom as String), keySize == 256, publicKeyData.count == 65 {
+            spkiData = Data(hexString: "3059301306072a8648ce3d020106082a8648ce3d030107034200").map { $0 + publicKeyData } ?? publicKeyData
+        } else {
+            spkiData = publicKeyData
+        }
+
+        return Data(SHA256.hash(data: spkiData)).base64EncodedString()
     }
 }

@@ -1,13 +1,19 @@
 import Foundation
 import CryptoKit
 import Security
+import CommonCrypto
 
 @MainActor
 final class WalletSecurityStore {
     static let shared = WalletSecurityStore()
 
     private let configAccount = "wallet_password_config"
+    private let lockoutAccount = "wallet_password_lockout"
     private let keychain = KeychainStore.shared
+    private let minimumPasswordLength = 12
+    private let pbkdf2Rounds = 600_000
+    private let maxFailedAttempts = 5
+    private let lockoutDuration: TimeInterval = 15 * 60
 
     private init() {}
 
@@ -17,46 +23,20 @@ final class WalletSecurityStore {
 
     func setPassword(_ password: String, wallets: [WalletAccount], usdtWallets: [USDTWallet] = []) async throws {
         let cleanPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard cleanPassword.count >= 8 else {
-            throw SecurityError.passwordTooShort
-        }
+        try validatePasswordPolicy(cleanPassword)
 
-        let salt = randomData(count: 16)
-        let passwordKey = deriveKey(password: cleanPassword, salt: salt)
+        let salt = randomData(count: 32)
+        let passwordKey = try deriveKey(password: cleanPassword, salt: salt)
         let verifier = passwordVerifier(passwordKey)
-        let config = PasswordConfig(salt: salt, verifier: verifier)
+        let config = PasswordConfig(salt: salt, verifier: verifier, kdf: "pbkdf2-hmac-sha256", rounds: pbkdf2Rounds)
         try keychain.saveGenericSecret(try JSONEncoder().encode(config), account: configAccount)
-
-        var syncedWalletIds: [UUID] = []
-        do {
-            for wallet in wallets {
-                let privateKey = try await keychain.loadPrivateKeySecure(
-                    for: wallet.id,
-                    reason: "Authenticate to sync this wallet with your password"
-                )
-                try savePasswordFallbackKey(privateKey, walletId: wallet.id, passwordKey: passwordKey)
-                syncedWalletIds.append(wallet.id)
-            }
-
-            for wallet in usdtWallets where wallet.isNative {
-                let privateKey = try await keychain.loadPrivateKeySecure(
-                    for: wallet.id,
-                    reason: "Authenticate to sync this USDT wallet with your password"
-                )
-                try savePasswordFallbackKey(privateKey, walletId: wallet.id, passwordKey: passwordKey)
-                syncedWalletIds.append(wallet.id)
-            }
-        } catch {
-            keychain.deleteGenericSecret(account: configAccount)
-            for walletId in syncedWalletIds {
-                keychain.deleteGenericSecret(account: fallbackAccount(walletId))
-            }
-            throw error
-        }
+        clearPasswordLockout()
+        purgeLegacyFallbackKeys(wallets: wallets, usdtWallets: usdtWallets)
     }
 
     func disablePassword(wallets: [WalletAccount], usdtWallets: [USDTWallet] = []) {
         keychain.deleteGenericSecret(account: configAccount)
+        keychain.deleteGenericSecret(account: lockoutAccount)
         for wallet in wallets {
             keychain.deleteGenericSecret(account: fallbackAccount(wallet.id))
         }
@@ -66,22 +46,8 @@ final class WalletSecurityStore {
     }
 
     func syncFallbackKeys(wallets: [WalletAccount], usdtWallets: [USDTWallet] = [], password: String) async throws {
-        let passwordKey = try verifiedPasswordKey(password)
-        for wallet in wallets {
-            let privateKey = try await keychain.loadPrivateKeySecure(
-                for: wallet.id,
-                reason: "Authenticate to sync this wallet with your password"
-            )
-            try savePasswordFallbackKey(privateKey, walletId: wallet.id, passwordKey: passwordKey)
-        }
-
-        for wallet in usdtWallets where wallet.isNative {
-            let privateKey = try await keychain.loadPrivateKeySecure(
-                for: wallet.id,
-                reason: "Authenticate to sync this USDT wallet with your password"
-            )
-            try savePasswordFallbackKey(privateKey, walletId: wallet.id, passwordKey: passwordKey)
-        }
+        _ = try verifiedPasswordKey(password)
+        purgeLegacyFallbackKeys(wallets: wallets, usdtWallets: usdtWallets)
     }
 
     func loadPrivateKeyForTransaction(
@@ -89,6 +55,10 @@ final class WalletSecurityStore {
         amountDescription: String,
         fallbackPassword: String? = nil
     ) async throws -> String {
+        guard !DeviceIntegrity.isLikelyCompromised else {
+            throw SecurityError.compromisedDevice
+        }
+
         do {
             return try await keychain.loadPrivateKeyForTransaction(
                 for: walletId,
@@ -98,7 +68,11 @@ final class WalletSecurityStore {
             guard let fallbackPassword else {
                 throw SecurityError.passwordRequired
             }
-            return try loadPasswordFallbackKey(walletId: walletId, password: fallbackPassword)
+            _ = try verifiedPasswordKey(fallbackPassword)
+            return try await keychain.loadPrivateKeyForTransaction(
+                for: walletId,
+                amountDescription: amountDescription
+            )
         }
     }
 
@@ -107,48 +81,44 @@ final class WalletSecurityStore {
     }
 
     private func verifiedPasswordKey(_ password: String) throws -> SymmetricKey {
+        try enforcePasswordLockout()
         guard let configData = try keychain.loadGenericSecret(account: configAccount) else {
             throw SecurityError.passwordNotSet
         }
         let config = try JSONDecoder().decode(PasswordConfig.self, from: configData)
-        let key = deriveKey(password: password, salt: config.salt)
+        let key = try deriveKey(password: password, salt: config.salt)
         guard passwordVerifier(key) == config.verifier else {
+            recordPasswordFailure()
             throw SecurityError.invalidPassword
         }
+        clearPasswordLockout()
         return key
-    }
-
-    private func savePasswordFallbackKey(_ privateKey: String, walletId: UUID, passwordKey: SymmetricKey) throws {
-        let sealedBox = try AES.GCM.seal(Data(privateKey.utf8), using: passwordKey)
-        guard let combined = sealedBox.combined else {
-            throw SecurityError.encryptionFailed
-        }
-        try keychain.saveGenericSecret(combined, account: fallbackAccount(walletId))
-    }
-
-    private func loadPasswordFallbackKey(walletId: UUID, password: String) throws -> String {
-        let passwordKey = try verifiedPasswordKey(password)
-        guard let encrypted = try keychain.loadGenericSecret(account: fallbackAccount(walletId)) else {
-            throw SecurityError.passwordFallbackMissing
-        }
-        let sealedBox = try AES.GCM.SealedBox(combined: encrypted)
-        let data = try AES.GCM.open(sealedBox, using: passwordKey)
-        guard let privateKey = String(data: data, encoding: .utf8) else {
-            throw SecurityError.decryptFailed
-        }
-        return privateKey
     }
 
     private func fallbackAccount(_ walletId: UUID) -> String {
         "wallet_password_fallback_\(walletId.uuidString)"
     }
 
-    private func deriveKey(password: String, salt: Data) -> SymmetricKey {
-        var data = Data(password.utf8) + salt
-        for _ in 0..<120_000 {
-            data = Data(SHA256.hash(data: data))
+    private func deriveKey(password: String, salt: Data) throws -> SymmetricKey {
+        var derived = [UInt8](repeating: 0, count: 32)
+        let passwordBytes = Array(password.utf8)
+        let saltBytes = [UInt8](salt)
+        let status = CCKeyDerivationPBKDF(
+            CCPBKDFAlgorithm(kCCPBKDF2),
+            passwordBytes,
+            passwordBytes.count,
+            saltBytes,
+            saltBytes.count,
+            CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
+            UInt32(pbkdf2Rounds),
+            &derived,
+            derived.count
+        )
+
+        guard status == kCCSuccess else {
+            throw SecurityError.kdfFailed
         }
-        return SymmetricKey(data: data)
+        return SymmetricKey(data: Data(derived))
     }
 
     private func passwordVerifier(_ key: SymmetricKey) -> Data {
@@ -163,37 +133,134 @@ final class WalletSecurityStore {
         return Data(bytes)
     }
 
+    private func validatePasswordPolicy(_ password: String) throws {
+        guard password.count >= minimumPasswordLength else {
+            throw SecurityError.passwordTooShort
+        }
+
+        let hasLowercase = password.rangeOfCharacter(from: .lowercaseLetters) != nil
+        let hasUppercase = password.rangeOfCharacter(from: .uppercaseLetters) != nil
+        let hasDigit = password.rangeOfCharacter(from: .decimalDigits) != nil
+        let hasSymbol = password.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil
+        guard [hasLowercase, hasUppercase, hasDigit, hasSymbol].filter({ $0 }).count >= 3 else {
+            throw SecurityError.passwordTooWeak
+        }
+    }
+
+    private func purgeLegacyFallbackKeys(wallets: [WalletAccount], usdtWallets: [USDTWallet]) {
+        for wallet in wallets {
+            keychain.deleteGenericSecret(account: fallbackAccount(wallet.id))
+        }
+        for wallet in usdtWallets where wallet.isNative {
+            keychain.deleteGenericSecret(account: fallbackAccount(wallet.id))
+        }
+    }
+
+    private func enforcePasswordLockout() throws {
+        guard let data = try keychain.loadGenericSecret(account: lockoutAccount),
+              let state = try? JSONDecoder().decode(PasswordLockoutState.self, from: data),
+              let lockedUntil = state.lockedUntil else {
+            return
+        }
+        if Date() < lockedUntil {
+            throw SecurityError.passwordLocked(lockedUntil)
+        }
+        clearPasswordLockout()
+    }
+
+    private func recordPasswordFailure() {
+        let existingData = try? keychain.loadGenericSecret(account: lockoutAccount)
+        let existing = existingData.flatMap { try? JSONDecoder().decode(PasswordLockoutState.self, from: $0) }
+        let attempts = (existing?.failedAttempts ?? 0) + 1
+        let lockedUntil = attempts >= maxFailedAttempts ? Date().addingTimeInterval(lockoutDuration) : nil
+        let state = PasswordLockoutState(failedAttempts: attempts, lockedUntil: lockedUntil)
+        if let data = try? JSONEncoder().encode(state) {
+            try? keychain.saveGenericSecret(data, account: lockoutAccount)
+        }
+    }
+
+    private func clearPasswordLockout() {
+        keychain.deleteGenericSecret(account: lockoutAccount)
+    }
+
     private struct PasswordConfig: Codable {
         let salt: Data
         let verifier: Data
+        let kdf: String?
+        let rounds: Int?
+    }
+
+    private struct PasswordLockoutState: Codable {
+        let failedAttempts: Int
+        let lockedUntil: Date?
     }
 
     enum SecurityError: LocalizedError {
         case passwordTooShort
+        case passwordTooWeak
         case passwordNotSet
         case passwordRequired
         case invalidPassword
-        case passwordFallbackMissing
-        case encryptionFailed
-        case decryptFailed
+        case passwordLocked(Date)
+        case compromisedDevice
+        case kdfFailed
 
         var errorDescription: String? {
             switch self {
             case .passwordTooShort:
-                return "Password must be at least 8 characters."
+                return "Password must be at least 12 characters."
+            case .passwordTooWeak:
+                return "Use a stronger password with at least three of: uppercase, lowercase, numbers, symbols."
             case .passwordNotSet:
                 return "Wallet password has not been set."
             case .passwordRequired:
                 return "Face ID failed. Please enter your wallet password."
             case .invalidPassword:
                 return "Invalid wallet password."
-            case .passwordFallbackMissing:
-                return "Password fallback is not synced for this wallet."
-            case .encryptionFailed:
-                return "Failed to encrypt wallet fallback key."
-            case .decryptFailed:
-                return "Failed to unlock wallet with password."
+            case .passwordLocked(let date):
+                let minutes = max(1, Int(ceil(date.timeIntervalSinceNow / 60)))
+                return "Too many incorrect password attempts. Try again in \(minutes) minutes."
+            case .compromisedDevice:
+                return "This device appears to be modified or jailbroken. Wallet signing is blocked for your protection."
+            case .kdfFailed:
+                return "Failed to derive a secure wallet password key."
             }
         }
+    }
+}
+
+enum DeviceIntegrity {
+    static var isLikelyCompromised: Bool {
+        #if targetEnvironment(simulator)
+        return false
+        #else
+        let suspiciousPaths = [
+            "/Applications/Cydia.app",
+            "/Applications/Sileo.app",
+            "/Applications/Zebra.app",
+            "/Library/MobileSubstrate/MobileSubstrate.dylib",
+            "/bin/bash",
+            "/usr/sbin/sshd",
+            "/etc/apt",
+            "/private/var/lib/apt",
+        ]
+
+        if suspiciousPaths.contains(where: { FileManager.default.fileExists(atPath: $0) }) {
+            return true
+        }
+
+        if getenv("DYLD_INSERT_LIBRARIES") != nil {
+            return true
+        }
+
+        let testPath = "/private/crbhub_integrity_test"
+        do {
+            try "test".write(toFile: testPath, atomically: true, encoding: .utf8)
+            try? FileManager.default.removeItem(atPath: testPath)
+            return true
+        } catch {
+            return false
+        }
+        #endif
     }
 }

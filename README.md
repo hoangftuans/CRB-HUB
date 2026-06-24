@@ -16,7 +16,7 @@
 This project is owned and maintained by **Hoang Tuan Nguyen**.
 
 > [!IMPORTANT]
-> **Cereblix Native & Secured**: This app runs **100% on the Cereblix network**. All private-key access is protected through iOS Keychain access control (`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` + current biometric set) and sensitive wallet actions require Face ID / Touch ID with password fallback. Your private keys never leave your device.
+> **Cereblix Native & Secured**: This app runs **100% on the Cereblix network**. All private-key access is protected through iOS Keychain access control (`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` + current biometric set). Wallet passwords are used for app unlock and verifier checks only; no password-encrypted private-key fallback copy is stored. Your private keys never leave your device.
 
 ### 🌟 Key Features
 * **Non-Custodial Wallet Management**: Generate a random ed25519 keypair or import via a 64-character hex private key. Securely encrypted and stored locally in the iOS Keychain.
@@ -24,13 +24,17 @@ This project is owned and maintained by **Hoang Tuan Nguyen**.
 * **Mining Monitor**: Track personal hashrates, worker statuses (Active/Idle), and Pool stats (Pool hashrate, active miners, blocks, pool fees, minimum payout). Includes a one-tap run command copy helper.
 * **P2P OTC Market & Trading**: Decentralized P2P login using ed25519 wallet signatures. View real-time order books, tickers, and recent trades. Manage complete trade lifecycles (Lock, Complete, Cancel, Appeal) with encrypted chat, block list controls, and feedback.
 * **USDT Wallet & SafeTrade Integration**: Link SafeTrade API credentials, sync supported USDT deposit wallets, choose default P2P receiving wallets per rail, view balances, and prepare protected USDT transfers for P2P escrow workflows.
-* **Production Transaction Protection**: CRB sends and USDT transfer flows require biometric authentication first, with password fallback for wallet unlock recovery.
+* **Production Transaction Protection**: CRB sends require biometric-protected Keychain access. USDT SafeTrade withdrawals unlock the API secret from biometric-protected Keychain before request signing.
 * **Localization & Fiat Conversion**: Supports 11 languages out-of-the-box (English, Vietnamese, Russian, Chinese, Korean, Japanese, Thai, Indonesian, Spanish, French, German). Converts CRB values to local fiat currencies dynamically (USD, VND, EUR, CNY, JPY, KRW, THB, IDR, RUB, GBP) with offline caching.
 * **Decimal-Safe Money Handling**: CRB/USDT prices, fiat rates, balances, and P2P amounts are handled with `Decimal` or integer base units to preserve small values such as `0.000x`.
 
 ### Recent Production Hardening
 * Upgraded Keychain private-key storage to passcode-required, this-device-only, biometric-current-set access control.
-* Added wallet password fallback and secure unlock paths for CRB sends, P2P login signing, and USDT transfer attempts.
+* Hardened wallet password handling with PBKDF2-HMAC-SHA256 verification, stronger password policy, lockout after repeated failures, and no password-encrypted private-key fallback storage.
+* Added app auto-lock/unlock for wallet content after backgrounding.
+* Added custom-node signing metadata validation against the official Cereblix node before CRB transaction signing.
+* Moved SafeTrade API key into Keychain and protected the SafeTrade API secret with biometric Keychain access control.
+* Switched Cereblix TLS pinning toward public-key pinning while keeping the legacy leaf certificate pin as a compatibility fallback.
 * Implemented real CRB transaction signing and broadcast payloads aligned with Cereblix transaction formats.
 * Hardened P2P login signing against replay by validating the canonical OTC challenge before signing.
 * Linked USDT wallets directly into P2P offer creation, take-offer flows, trade detail, and persisted wallet bindings.
@@ -114,7 +118,7 @@ graph TD
 Dự án được sở hữu và phát triển bởi **Hoang Tuan Nguyen**.
 
 > [!IMPORTANT]
-> **Hoạt động 100% trên Cereblix**: Dự án được xây dựng và chạy **100% trực tiếp trên mạng lưới Cereblix**. Mọi đường đọc khóa bí mật đều đi qua Keychain access control (`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` + bộ sinh trắc học hiện tại), kết hợp Face ID / Touch ID và cơ chế nhập mật khẩu dự phòng. Khóa bí mật của bạn không bao giờ rời khỏi thiết bị.
+> **Hoạt động 100% trên Cereblix**: Dự án được xây dựng và chạy **100% trực tiếp trên mạng lưới Cereblix**. Mọi đường đọc khóa bí mật đều đi qua Keychain access control (`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` + bộ sinh trắc học hiện tại). Mật khẩu ví chỉ dùng cho mở khóa app và xác minh, không lưu thêm bản khóa bí mật mã hóa bằng mật khẩu. Khóa bí mật của bạn không bao giờ rời khỏi thiết bị.
 
 ### 🌟 Tính Năng Chính
 * **Quản Lý Ví Bảo Mật**: Tạo ví mới (sinh cặp khóa ed25519 ngẫu nhiên) hoặc nhập ví cũ (qua khóa bí mật Hex 64 ký tự). Khóa được mã hóa và lưu trữ an toàn cục bộ trong iOS Keychain.
@@ -122,12 +126,17 @@ Dự án được sở hữu và phát triển bởi **Hoang Tuan Nguyen**.
 * **Theo Dõi Khai Thác**: Hiển thị hashrate cá nhân, hashrate pool, thợ đào đang hoạt động, khối tìm thấy, phí pool và hạn mức thanh toán. Hỗ trợ sao chép lệnh chạy miner chỉ với 1 lượt chạm.
 * **Thị Trường P2P OTC**: Đăng nhập P2P không mật khẩu sử dụng chữ ký số ed25519. Xem sổ lệnh, ticker và lịch sử giao dịch. Quản lý trạng thái giao dịch (Khóa quỹ, Hoàn thành, Hủy, Khiếu nại) đi kèm phòng chat trực tiếp mã hóa, chặn người dùng và đánh giá tín nhiệm.
 * **Ví USDT & SafeTrade**: Liên kết API SafeTrade, đồng bộ ví nhận USDT theo mạng được hỗ trợ, chọn ví mặc định cho P2P, xem số dư và chuẩn bị luồng chuyển USDT có xác thực.
-* **Bảo Vệ Giao Dịch Production**: Chuyển CRB và các luồng chuyển USDT yêu cầu Face ID / Touch ID trước, nếu thất bại có thể mở khóa bằng mật khẩu ví.
+* **Bảo Vệ Giao Dịch Production**: Chuyển CRB yêu cầu Keychain sinh trắc học. Rút USDT qua SafeTrade mở khóa API secret từ Keychain sinh trắc học trước khi ký request.
 * **Đa Ngôn Ngữ & Quy Đổi Ngoại Tệ**: Hỗ trợ tự động 11 ngôn ngữ phổ biến nhất dựa trên ngôn ngữ thiết bị. Quy đổi số dư CRB sang tỷ giá fiat nội địa tương ứng với vùng (Region) của điện thoại (VND, USD, EUR, CNY, JPY, KRW, THB, IDR, RUB, GBP) với cơ chế lưu đệm offline.
 * **Tính Toán Tiền Bằng Decimal**: Giá CRB/USDT, tỷ giá fiat, số dư và khối lượng P2P dùng `Decimal` hoặc đơn vị gốc để giữ chính xác các giá trị rất nhỏ như `0.000x`.
 
 ### Nâng Cấp Production Gần Đây
 * Nâng bảo vệ Keychain lên passcode-required, this-device-only và biometric-current-set.
+* Tăng cường mật khẩu ví bằng PBKDF2-HMAC-SHA256, chính sách mật khẩu mạnh hơn, lockout khi nhập sai nhiều lần và loại bỏ bản private-key fallback mã hóa bằng mật khẩu.
+* Thêm app auto-lock/unlock sau khi ứng dụng vào background.
+* Thêm kiểm tra metadata ký giao dịch từ custom node với official Cereblix node trước khi ký CRB.
+* Chuyển SafeTrade API key vào Keychain và bảo vệ SafeTrade API secret bằng Keychain sinh trắc học.
+* Chuyển TLS pinning của Cereblix sang hướng public-key pinning, giữ leaf pin cũ làm fallback tương thích.
 * Thêm mật khẩu ví dự phòng cho các luồng mở khóa khi Face ID / Touch ID thất bại.
 * Kích hoạt ký và broadcast giao dịch CRB thật theo định dạng giao dịch Cereblix.
 * Siết P2P login signing bằng cách xác thực challenge OTC chuẩn trước khi ký.

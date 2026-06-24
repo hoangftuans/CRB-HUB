@@ -127,6 +127,11 @@ final class WalletViewModel {
         do {
             let currentBalance = try await CereblixAPIClient.getBalance(address: wallet.address)
             let currentStatus = try await CereblixAPIClient.getStatus()
+            try await validateSigningMetadata(
+                wallet: wallet,
+                balance: currentBalance,
+                status: currentStatus
+            )
             let amountDescription = "\(CRBUnits.formatCRB(amount, maxFractionDigits: 8, minFractionDigits: 0)) CRB"
             let privateKeyHex = try await WalletSecurityStore.shared.loadPrivateKeyForTransaction(
                 walletId: wallet.id,
@@ -154,6 +159,34 @@ final class WalletViewModel {
             sendError = error.localizedDescription
         }
     }
+
+    private func validateSigningMetadata(wallet: WalletAccount, balance: BalanceResponse, status: ChainStatus) async throws {
+        guard status.height >= 0 else {
+            throw SigningMetadataError.invalidHeight
+        }
+
+        let usingOfficialNode = APIConfig.baseURL.lowercased() == APIConfig.officialBaseURL.lowercased()
+        guard !usingOfficialNode else { return }
+
+        let officialStatus = try await CereblixAPIClient.getStatus(baseURL: APIConfig.officialBaseURL)
+        let officialBalance = try await CereblixAPIClient.getBalance(address: wallet.address, baseURL: APIConfig.officialBaseURL)
+
+        if let officialChainID = officialStatus.chain_id,
+           let nodeChainID = status.chain_id,
+           !officialChainID.isEmpty,
+           !nodeChainID.isEmpty,
+           officialChainID != nodeChainID {
+            throw SigningMetadataError.chainIDMismatch
+        }
+
+        if abs(status.height - officialStatus.height) > 6 {
+            throw SigningMetadataError.heightMismatch
+        }
+
+        if balance.nonce < officialBalance.nonce {
+            throw SigningMetadataError.staleNonce
+        }
+    }
     
     func startAutoRefresh(address: String) {
         stopAutoRefresh()
@@ -170,5 +203,25 @@ final class WalletViewModel {
     func stopAutoRefresh() {
         refreshTask?.cancel()
         refreshTask = nil
+    }
+
+    enum SigningMetadataError: LocalizedError {
+        case invalidHeight
+        case chainIDMismatch
+        case heightMismatch
+        case staleNonce
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidHeight:
+                return "Node returned an invalid signing height."
+            case .chainIDMismatch:
+                return "Custom node chain ID does not match the official Cereblix node. Transaction signing was blocked."
+            case .heightMismatch:
+                return "Custom node height is too far from the official Cereblix node. Transaction signing was blocked."
+            case .staleNonce:
+                return "Custom node returned an old nonce. Transaction signing was blocked."
+            }
+        }
     }
 }

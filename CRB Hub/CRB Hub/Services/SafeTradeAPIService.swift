@@ -6,17 +6,17 @@ final class SafeTradeAPIService {
     static let shared = SafeTradeAPIService()
 
     private let settingsKey = "safetrade_api_settings"
+    private let apiKeyAccount = "safetrade_api_key"
     private let secretAccount = "safetrade_api_secret"
+    private let configuredAccount = "safetrade_api_configured"
     private let keychain = KeychainStore.shared
 
     private init() {}
 
     var settings: Settings {
         get {
-            guard let data = UserDefaults.standard.data(forKey: settingsKey),
-                  let settings = try? JSONDecoder().decode(Settings.self, from: data) else {
-                return .default
-            }
+            let settings = loadStoredSettings()
+            migrateLegacyAPIKeyIfNeeded(settings)
             return settings
         }
         set {
@@ -24,27 +24,43 @@ final class SafeTradeAPIService {
         }
     }
 
+    var configuredAPIKey: String {
+        (try? loadAPIKey()) ?? settings.apiKey
+    }
+
     var isEnabled: Bool {
-        guard let secret = try? loadSecret() else {
+        guard settings.isEnabled,
+              let apiKey = try? loadAPIKey(),
+              !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              (try? keychain.loadGenericSecret(account: configuredAccount)) != nil else {
             return false
         }
-        return settings.isEnabled && !secret.isEmpty
+        return true
     }
 
     func save(settings: Settings, apiSecret: String?) throws {
         var clean = settings.normalized
         clean.lastTestedAt = nil
         clean.lastTestStatus = nil
+        let apiKey = clean.apiKey
+        clean.apiKey = ""
         self.settings = clean
 
+        if !apiKey.isEmpty {
+            try keychain.saveGenericSecret(Data(apiKey.utf8), account: apiKeyAccount)
+        }
+
         if let apiSecret, !apiSecret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            try keychain.saveGenericSecret(Data(apiSecret.utf8), account: secretAccount)
+            try keychain.saveGenericSecretWithBiometrics(Data(apiSecret.utf8), account: secretAccount)
+            try keychain.saveGenericSecret(Data("1".utf8), account: configuredAccount)
         }
     }
 
     func disconnect() {
         settings = .default
+        keychain.deleteGenericSecret(account: apiKeyAccount)
         keychain.deleteGenericSecret(account: secretAccount)
+        keychain.deleteGenericSecret(account: configuredAccount)
     }
 
     func testConnection() async throws -> String {
@@ -52,7 +68,8 @@ final class SafeTradeAPIService {
             path: settings.normalized.statusPath,
             method: "GET",
             queryItems: [],
-            body: Optional<EmptyBody>.none
+            body: Optional<EmptyBody>.none,
+            authReason: "Authenticate to test SafeTrade API credentials"
         )
         var updated = settings
         updated.lastTestedAt = Date()
@@ -70,7 +87,8 @@ final class SafeTradeAPIService {
             path: settings.normalized.balancePath,
             method: "GET",
             queryItems: [],
-            body: Optional<EmptyBody>.none
+            body: Optional<EmptyBody>.none,
+            authReason: "Authenticate to read SafeTrade USDT balance"
         )
 
         guard let account = response.first(where: { $0.currency.lowercased() == "usdt" }) else {
@@ -88,7 +106,8 @@ final class SafeTradeAPIService {
             path: "trade/account/deposit_address/usdt",
             method: "GET",
             queryItems: [URLQueryItem(name: "network", value: network.safeTradeBlockchainKey)],
-            body: Optional<EmptyBody>.none
+            body: Optional<EmptyBody>.none,
+            authReason: "Authenticate to read SafeTrade deposit address"
         )
         guard !response.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw SafeTradeError.unexpectedResponse
@@ -127,7 +146,8 @@ final class SafeTradeAPIService {
             path: settings.normalized.balancePath,
             method: "GET",
             queryItems: [],
-            body: Optional<EmptyBody>.none
+            body: Optional<EmptyBody>.none,
+            authReason: "Authenticate to sync SafeTrade USDT wallets"
         )
         guard let usdtAccount = response.first(where: { $0.currency.lowercased() == "usdt" }) else {
             return []
@@ -153,6 +173,9 @@ final class SafeTradeAPIService {
         guard isEnabled else {
             throw SafeTradeError.notConfigured
         }
+        guard !DeviceIntegrity.isLikelyCompromised else {
+            throw SafeTradeError.compromisedDevice
+        }
 
         let requestBody = SafeTradeGenerateWithdrawCodeRequest(
             address: recipient,
@@ -166,13 +189,17 @@ final class SafeTradeAPIService {
             path: settings.normalized.generateWithdrawCodePath,
             method: "POST",
             queryItems: [],
-            body: requestBody
+            body: requestBody,
+            authReason: "Authenticate to generate SafeTrade withdraw code"
         )
     }
 
     func transferUSDT(wallet: USDTWallet, to recipient: String, amount: Decimal, codes: SafeTradeWithdrawCodes = SafeTradeWithdrawCodes()) async throws -> String {
         guard isEnabled else {
             throw SafeTradeError.notConfigured
+        }
+        guard !DeviceIntegrity.isLikelyCompromised else {
+            throw SafeTradeError.compromisedDevice
         }
 
         let requestBody = SafeTradeTransferRequest(
@@ -191,7 +218,8 @@ final class SafeTradeAPIService {
             path: settings.normalized.transferPath,
             method: "POST",
             queryItems: [],
-            body: requestBody
+            body: requestBody,
+            authReason: "Authenticate to authorize SafeTrade withdrawal"
         )
 
         guard let txid = response.displayId, !txid.isEmpty else {
@@ -212,7 +240,8 @@ final class SafeTradeAPIService {
         path: String,
         method: String,
         queryItems: [URLQueryItem],
-        body: B?
+        body: B?,
+        authReason: String
     ) async throws -> T {
         let config = settings.normalized
         guard var components = URLComponents(string: config.baseURL) else {
@@ -233,7 +262,8 @@ final class SafeTradeAPIService {
         request.timeoutInterval = APIConfig.timeout
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json;charset=utf-8", forHTTPHeaderField: "Content-Type")
-        try sign(&request, apiKey: config.apiKey, secret: loadSecret())
+        let credentials = try await loadCredentials(reason: authReason)
+        try sign(&request, apiKey: credentials.apiKey, secret: credentials.secret)
 
         if let body {
             let payload = try JSONEncoder().encode(body)
@@ -271,13 +301,46 @@ final class SafeTradeAPIService {
         request.setValue(Data(signature).hexString, forHTTPHeaderField: "X-Auth-Signature")
     }
 
-    private func loadSecret() throws -> String {
-        guard let data = try keychain.loadGenericSecret(account: secretAccount),
+    private func loadCredentials(reason: String) async throws -> (apiKey: String, secret: String) {
+        let apiKey = try loadAPIKey()
+        guard let data = try await keychain.loadGenericSecretWithBiometrics(account: secretAccount, reason: reason),
               let secret = String(data: data, encoding: .utf8),
               !secret.isEmpty else {
             throw SafeTradeError.notConfigured
         }
-        return secret
+        return (apiKey, secret)
+    }
+
+    private func loadAPIKey() throws -> String {
+        if let data = try keychain.loadGenericSecret(account: apiKeyAccount),
+           let apiKey = String(data: data, encoding: .utf8),
+           !apiKey.isEmpty {
+            return apiKey
+        }
+        let legacy = loadStoredSettings().apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !legacy.isEmpty else {
+            throw SafeTradeError.notConfigured
+        }
+        return legacy
+    }
+
+    private func migrateLegacyAPIKeyIfNeeded(_ settings: Settings) {
+        let legacy = settings.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !legacy.isEmpty, (try? keychain.loadGenericSecret(account: apiKeyAccount)) == nil else {
+            return
+        }
+        try? keychain.saveGenericSecret(Data(legacy.utf8), account: apiKeyAccount)
+        var migrated = settings
+        migrated.apiKey = ""
+        UserDefaults.standard.set(try? JSONEncoder().encode(migrated), forKey: settingsKey)
+    }
+
+    private func loadStoredSettings() -> Settings {
+        guard let data = UserDefaults.standard.data(forKey: settingsKey),
+              let settings = try? JSONDecoder().decode(Settings.self, from: data) else {
+            return .default
+        }
+        return settings
     }
 
     struct Settings: Codable, Equatable {
@@ -385,6 +448,7 @@ final class SafeTradeAPIService {
         case server(Int, String?)
         case decoding(Error)
         case unexpectedResponse
+        case compromisedDevice
 
         var errorDescription: String? {
             switch self {
@@ -402,6 +466,8 @@ final class SafeTradeAPIService {
                 return "SafeTrade response parsing failed: \(error.localizedDescription)"
             case .unexpectedResponse:
                 return "SafeTrade returned an unexpected response format."
+            case .compromisedDevice:
+                return "This device appears to be modified or jailbroken. SafeTrade withdrawals are blocked for your protection."
             }
         }
     }

@@ -61,6 +61,10 @@ final class AppState {
     var wallets: [WalletAccount] = []
     var selectedWallet: WalletAccount?
     var hasCompletedOnboarding: Bool = false
+    var isAppLocked: Bool = false
+    var appLockError: String?
+    private var backgroundedAt: Date?
+    private let appLockGracePeriod: TimeInterval = 30
 
     // MARK: - Node Config
     var nodeBaseURL: String = "https://cereblix.com" {
@@ -206,11 +210,55 @@ final class AppState {
 
     // MARK: - Wallet Management
 
+    func lockApp() {
+        guard hasCompletedOnboarding else { return }
+        isAppLocked = true
+    }
+
+    func markBackgrounded() {
+        backgroundedAt = Date()
+        lockApp()
+    }
+
+    func handleAppActive() {
+        guard hasCompletedOnboarding else {
+            isAppLocked = false
+            return
+        }
+        guard let backgroundedAt else { return }
+        if Date().timeIntervalSince(backgroundedAt) >= appLockGracePeriod {
+            lockApp()
+        }
+    }
+
+    func unlockAppWithBiometrics() async {
+        appLockError = nil
+        do {
+            try await KeychainStore.shared.authenticateBiometrics(reason: "Authenticate to unlock CRB Hub")
+            isAppLocked = false
+            backgroundedAt = nil
+        } catch {
+            appLockError = error.localizedDescription
+        }
+    }
+
+    func unlockApp(password: String) {
+        appLockError = nil
+        do {
+            try WalletSecurityStore.shared.verifyPassword(password)
+            isAppLocked = false
+            backgroundedAt = nil
+        } catch {
+            appLockError = error.localizedDescription
+        }
+    }
+
     func createWallet(name: String) throws {
         let wallet = try KeychainStore.shared.createWallet(name: name)
         wallets.append(wallet)
         selectedWallet = wallet
         hasCompletedOnboarding = true
+        isAppLocked = false
     }
 
     func createWalletWithBiometricSetup(name: String) async throws {
@@ -218,6 +266,7 @@ final class AppState {
         wallets.append(wallet)
         selectedWallet = wallet
         hasCompletedOnboarding = true
+        isAppLocked = false
     }
 
     func importWallet(name: String, privateKeyHex: String) throws {

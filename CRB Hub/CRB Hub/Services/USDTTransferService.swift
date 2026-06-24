@@ -22,8 +22,6 @@ struct USDTTransferService {
                     amountDescription: "\(CRBUnits.formatDecimal(amount, maxFractionDigits: 6, minFractionDigits: 0)) USDT",
                     fallbackPassword: fallbackPassword
                 )
-            } else {
-                try await authenticateSafeTradeTransfer(amount: amount, fallbackPassword: fallbackPassword)
             }
             return try await SafeTradeAPIService.shared.transferUSDT(wallet: wallet, to: recipient, amount: amount, codes: safeTradeCodes)
         }
@@ -47,19 +45,6 @@ struct USDTTransferService {
             return address.hasPrefix("0x") && address.count == 42 && body.unicodeScalars.allSatisfy { hex.contains($0) }
         case .trc20:
             return address.hasPrefix("T") && address.count == 34
-        }
-    }
-
-    private static func authenticateSafeTradeTransfer(amount: Decimal, fallbackPassword: String?) async throws {
-        do {
-            try await KeychainStore.shared.authenticateBiometrics(
-                reason: "Authenticate to send \(CRBUnits.formatDecimal(amount, maxFractionDigits: 6, minFractionDigits: 0)) USDT with SafeTrade"
-            )
-        } catch KeychainStore.KeychainError.biometricAuthFailed {
-            guard let fallbackPassword else {
-                throw WalletSecurityStore.SecurityError.passwordRequired
-            }
-            try WalletSecurityStore.shared.verifyPassword(fallbackPassword)
         }
     }
 

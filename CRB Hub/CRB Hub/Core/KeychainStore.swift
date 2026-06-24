@@ -251,6 +251,28 @@ final class KeychainStore {
         }
     }
 
+    func saveGenericSecretWithBiometrics(_ data: Data, account: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: securityService,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
+
+        let accessControl = try createAccessControl()
+        let addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: securityService,
+            kSecAttrAccount as String: account,
+            kSecAttrAccessControl as String: accessControl,
+            kSecValueData as String: data,
+        ]
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw KeychainError.saveFailed(status)
+        }
+    }
+
     func loadGenericSecret(account: String) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -266,6 +288,36 @@ final class KeychainStore {
             return nil
         }
         guard status == errSecSuccess else {
+            throw KeychainError.loadFailed(status)
+        }
+        guard let data = result as? Data else {
+            throw KeychainError.invalidData
+        }
+        return data
+    }
+
+    func loadGenericSecretWithBiometrics(account: String, reason: String) async throws -> Data? {
+        let context = LAContext()
+        context.localizedReason = reason
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: securityService,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationContext as String: context,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound {
+            return nil
+        }
+        guard status == errSecSuccess else {
+            if status == errSecUserCanceled || status == errSecAuthFailed {
+                throw KeychainError.biometricAuthFailed
+            }
             throw KeychainError.loadFailed(status)
         }
         guard let data = result as? Data else {

@@ -101,7 +101,7 @@ struct SafeTradeAPISettingsView: View {
                     .foregroundColor(CRBTheme.Colors.error)
             }
 
-            Text("Secrets are stored in iOS Keychain. Transfer requests still require wallet Face ID/password before SafeTrade is called.".localized)
+            Text("SafeTrade credentials are stored in iOS Keychain. The API secret is protected by Face ID before SafeTrade requests are signed.".localized)
                 .font(.system(size: 11))
                 .foregroundColor(CRBTheme.Colors.muted)
         }
@@ -157,7 +157,7 @@ struct SafeTradeAPISettingsView: View {
         let settings = SafeTradeAPIService.shared.settings
         isEnabled = settings.isEnabled
         baseURL = settings.baseURL
-        apiKey = settings.apiKey
+        apiKey = SafeTradeAPIService.shared.configuredAPIKey
         apiSecret = ""
         statusPath = settings.statusPath
         balancePath = settings.balancePath

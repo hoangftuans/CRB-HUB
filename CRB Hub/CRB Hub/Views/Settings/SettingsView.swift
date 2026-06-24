@@ -351,8 +351,9 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
                 securityItem("Private keys stored in iOS Keychain".localized)
                 securityItem("Keys never leave your device".localized)
-                securityItem("Transactions require Face ID, with wallet password fallback".localized)
-                securityItem("Password fallback keys stay encrypted on this device".localized)
+                securityItem("Transactions require Keychain biometric access".localized)
+                securityItem("Wallet password uses PBKDF2 verification and app unlock lockout".localized)
+                securityItem("No password-encrypted private key fallback is stored".localized)
                 securityItem("P2P token held in memory only".localized)
                 securityItem("No analytics or tracking".localized)
             }
@@ -371,7 +372,7 @@ struct SettingsView: View {
                     Text("Wallet Password".localized)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(CRBTheme.Colors.ink)
-                    Text(WalletSecurityStore.shared.isPasswordEnabled ? "Enabled as Face ID fallback".localized : "Set a password for Web3-style unlock fallback".localized)
+                    Text(WalletSecurityStore.shared.isPasswordEnabled ? "Enabled for app unlock and fallback verification".localized : "Set a strong password for app unlock fallback".localized)
                         .font(.system(size: 12))
                         .foregroundColor(CRBTheme.Colors.muted)
                 }
@@ -379,7 +380,7 @@ struct SettingsView: View {
                 Spacer()
             }
 
-            SecureField("Password (min 8 characters)".localized, text: $walletPassword)
+            SecureField("Password (min 12 characters)".localized, text: $walletPassword)
                 .textFieldStyle(.plain)
                 .foregroundColor(CRBTheme.Colors.ink)
                 .padding(CRBTheme.Spacing.md)
@@ -432,7 +433,7 @@ struct SettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "arrow.triangle.2.circlepath")
-                        Text("Sync Password with Wallets".localized)
+                        Text("Verify Password & Remove Legacy Fallbacks".localized)
                             .font(.system(size: 13, weight: .bold))
                         Spacer()
                     }
@@ -492,7 +493,7 @@ struct SettingsView: View {
         walletPasswordSuccess = nil
         let password = walletPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !password.isEmpty else {
-            walletPasswordError = "Enter your wallet password to sync"
+            walletPasswordError = "Enter your wallet password to verify"
             return
         }
 
@@ -506,7 +507,7 @@ struct SettingsView: View {
                 )
                 walletPassword = ""
                 walletPasswordConfirm = ""
-                walletPasswordSuccess = "Wallet password synced"
+                walletPasswordSuccess = "Wallet password verified and legacy fallbacks removed"
             } catch {
                 walletPasswordError = error.localizedDescription
             }
@@ -1031,7 +1032,6 @@ struct SettingsView: View {
                         Text(key)
                             .font(.system(size: 12, weight: .medium, design: .monospaced))
                             .foregroundColor(CRBTheme.Colors.error)
-                            .textSelection(.enabled)
                             .padding(CRBTheme.Spacing.lg)
                             .background(CRBTheme.Colors.error.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))

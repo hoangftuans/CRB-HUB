@@ -163,7 +163,6 @@ struct CreateWalletView: View {
                     Text(key)
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundColor(CRBTheme.Colors.error)
-                        .textSelection(.enabled)
                         .padding(CRBTheme.Spacing.md)
                         .background(CRBTheme.Colors.error.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
