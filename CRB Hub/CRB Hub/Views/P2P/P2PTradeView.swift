@@ -7,6 +7,8 @@ struct P2PTradeView: View {
     @State private var actionError: String?
     @State private var usdtFallbackWalletId: UUID?
     @State private var usdtFallbackPassword = ""
+    @State private var pendingEscrowCopy: EscrowCopyRequest?
+    @State private var pendingEscrowPayment: EscrowPaymentRequest?
     
     let tradeId: String
     
@@ -65,6 +67,55 @@ struct P2PTradeView: View {
         }
         .onDisappear {
             viewModel.stopAutoRefresh()
+        }
+        .confirmationDialog(
+            "Verify Escrow Address".localized,
+            isPresented: Binding(
+                get: { pendingEscrowCopy != nil },
+                set: { if !$0 { pendingEscrowCopy = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let request = pendingEscrowCopy {
+                Button("Copy Confirmed Details".localized) {
+                    copyEscrowPayment(address: request.address, amount: request.amount, asset: request.asset)
+                    pendingEscrowCopy = nil
+                }
+                Button("Cancel".localized, role: .cancel) {
+                    pendingEscrowCopy = nil
+                }
+            }
+        } message: {
+            if let request = pendingEscrowCopy {
+                Text("Trade \(tradeId)\nNetwork: \(request.network)\nAmount: \(request.amount) \(request.asset)\nAddress: \(request.address)\n\nOnly continue if this matches the official OTC trade details.".localized)
+            }
+        }
+        .confirmationDialog(
+            "Confirm USDT Escrow Payment".localized,
+            isPresented: Binding(
+                get: { pendingEscrowPayment != nil },
+                set: { if !$0 { pendingEscrowPayment = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let request = pendingEscrowPayment {
+                Button("Pay Confirmed Escrow".localized) {
+                    payNativeUSDTEscrow(
+                        wallet: request.wallet,
+                        escrowAddr: request.address,
+                        amount: request.amount,
+                        fallbackPassword: request.fallbackPassword
+                    )
+                    pendingEscrowPayment = nil
+                }
+                Button("Cancel".localized, role: .cancel) {
+                    pendingEscrowPayment = nil
+                }
+            }
+        } message: {
+            if let request = pendingEscrowPayment {
+                Text("Trade \(tradeId)\nNetwork: \(request.network)\nAmount: \(request.amount) USDT\nAddress: \(request.address)\n\nOnly send if this is the escrow address shown by the official OTC trade.".localized)
+            }
         }
     }
     
@@ -444,7 +495,12 @@ struct P2PTradeView: View {
                                 Spacer()
                                 
                                 Button {
-                                    UIPasteboard.general.string = escrowAddr
+                                    pendingEscrowCopy = EscrowCopyRequest(
+                                        address: escrowAddr,
+                                        amount: amountStr,
+                                        asset: assetName,
+                                        network: isSeller ? "CRB" : railReceiveLabel(trade.Rail ?? "")
+                                    )
                                 } label: {
                                     Image(systemName: "doc.on.doc")
                                         .font(.system(size: 14))
@@ -505,7 +561,13 @@ struct P2PTradeView: View {
                                                  if wallet.isNative {
                                                      VStack(alignment: .leading, spacing: 6) {
                                                          Button {
-                                                             payNativeUSDTEscrow(wallet: wallet, escrowAddr: escrowAddr, amount: amountStr)
+                                                             pendingEscrowPayment = EscrowPaymentRequest(
+                                                                wallet: wallet,
+                                                                address: escrowAddr,
+                                                                amount: amountStr,
+                                                                network: railReceiveLabel(trade.Rail ?? ""),
+                                                                fallbackPassword: nil
+                                                             )
                                                          } label: {
                                                              HStack {
                                                                  Image(systemName: "faceid")
@@ -529,7 +591,13 @@ struct P2PTradeView: View {
                                                                  .clipShape(RoundedRectangle(cornerRadius: 6))
 
                                                              Button {
-                                                                 payNativeUSDTEscrow(wallet: wallet, escrowAddr: escrowAddr, amount: amountStr, fallbackPassword: usdtFallbackPassword)
+                                                                 pendingEscrowPayment = EscrowPaymentRequest(
+                                                                    wallet: wallet,
+                                                                    address: escrowAddr,
+                                                                    amount: amountStr,
+                                                                    network: railReceiveLabel(trade.Rail ?? ""),
+                                                                    fallbackPassword: usdtFallbackPassword
+                                                                 )
                                                              } label: {
                                                                  Text("Unlock with Password".localized)
                                                                      .font(.system(size: 12, weight: .bold))
@@ -548,7 +616,12 @@ struct P2PTradeView: View {
                                                      .clipShape(RoundedRectangle(cornerRadius: 6))
                                                  } else {
                                                      Button {
-                                                         copyEscrowPayment(address: escrowAddr, amount: amountStr, asset: assetName)
+                                                         pendingEscrowCopy = EscrowCopyRequest(
+                                                            address: escrowAddr,
+                                                            amount: amountStr,
+                                                            asset: assetName,
+                                                            network: railReceiveLabel(trade.Rail ?? "")
+                                                         )
                                                      } label: {
                                                          HStack {
                                                              Image(systemName: "doc.on.doc")
@@ -788,6 +861,21 @@ struct P2PTradeView: View {
 
     private func copyEscrowPayment(address: String, amount: String, asset: String) {
         UIPasteboard.general.string = "\(asset) \(amount)\n\(address)"
+    }
+
+    private struct EscrowCopyRequest {
+        let address: String
+        let amount: String
+        let asset: String
+        let network: String
+    }
+
+    private struct EscrowPaymentRequest {
+        let wallet: USDTWallet
+        let address: String
+        let amount: String
+        let network: String
+        let fallbackPassword: String?
     }
 }
 

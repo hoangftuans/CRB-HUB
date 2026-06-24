@@ -3,7 +3,6 @@ import SwiftUI
 struct USDTWalletManagerView: View {
     @Environment(AppState.self) private var appState
     @State private var showAddSheet = false
-    @State private var showGenerateSheet = false
     @State private var selectedSendWallet: USDTWallet?
     @State private var isRefreshing = false
     @State private var isSyncingSafeTrade = false
@@ -26,6 +25,8 @@ struct USDTWalletManagerView: View {
                     if SafeTradeAPIService.shared.isEnabled {
                         safeTradeWalletSection
                     }
+
+                    privacyDisclosureSection
 
                     p2pDefaultWalletSection
 
@@ -64,20 +65,23 @@ struct USDTWalletManagerView: View {
                             )
                         }
 
-                        Button {
-                            showGenerateSheet = true
-                        } label: {
+                        Button {} label: {
                             HStack {
-                                Image(systemName: "plus.circle.fill")
-                                Text("Create Native USDT Wallet".localized)
+                                Image(systemName: "lock.shield.fill")
+                                Text("Native USDT Wallet Disabled".localized)
                                     .fontWeight(.bold)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(CRBTheme.Spacing.md)
-                            .background(CRBTheme.Gradients.primary)
-                            .foregroundColor(Color(hex: 0x06121F))
+                            .background(CRBTheme.Colors.warning.opacity(0.08))
+                            .foregroundColor(CRBTheme.Colors.warning)
                             .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: CRBTheme.Radius.md)
+                                    .stroke(CRBTheme.Colors.warning.opacity(0.25), lineWidth: 1)
+                            )
                         }
+                        .disabled(true)
                     }
                     .padding(.top, CRBTheme.Spacing.md)
                 }
@@ -95,9 +99,6 @@ struct USDTWalletManagerView: View {
         .sheet(isPresented: $showAddSheet) {
             AddUSDTWalletSheet()
         }
-        .sheet(isPresented: $showGenerateSheet) {
-            GenerateNativeUSDTSheet()
-        }
         .sheet(item: $selectedSendWallet) { wallet in
             SendUSDTSheet(wallet: wallet)
         }
@@ -108,6 +109,33 @@ struct USDTWalletManagerView: View {
     }
 
     // MARK: - Wallet Card Component
+
+    private var privacyDisclosureSection: some View {
+        HStack(alignment: .top, spacing: CRBTheme.Spacing.sm) {
+            Image(systemName: "network.badge.shield.half.filled")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(CRBTheme.Colors.warning)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("USDT Balance Privacy".localized)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(CRBTheme.Colors.ink)
+
+                Text("External wallet balance checks may query public RPC providers for Ethereum, BSC, Polygon, or Tron. This can expose the wallet address and IP address to those providers. SafeTrade wallets use the SafeTrade API instead.".localized)
+                    .font(.system(size: 12))
+                    .foregroundColor(CRBTheme.Colors.muted)
+                    .lineSpacing(3)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(CRBTheme.Spacing.md)
+        .background(CRBTheme.Colors.warning.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: CRBTheme.Radius.md)
+                .stroke(CRBTheme.Colors.warning.opacity(0.16), lineWidth: 1)
+        )
+    }
 
     private var safeTradeWalletSection: some View {
         VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
@@ -762,243 +790,5 @@ struct SendUSDTSheet: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")
         return Decimal(string: clean)
-    }
-}
-
-// MARK: - Generate Native Wallet Sheet
-
-struct GenerateNativeUSDTSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
-
-    @State private var name = ""
-    @State private var network: USDTNetwork = .polygon
-    @State private var generatedWallet: (privateKey: String, address: String)?
-    @State private var isCreating = false
-    @State private var copiedKey = false
-    @State private var error: String?
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                CRBTheme.Colors.background.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: CRBTheme.Spacing.xl) {
-                        if generatedWallet != nil {
-                            successContent
-                        } else {
-                            formContent
-                        }
-                    }
-                    .padding(CRBTheme.Spacing.xl)
-                }
-            }
-            .navigationTitle("New Native USDT Wallet".localized)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    if generatedWallet == nil {
-                        Button("Cancel".localized) {
-                            dismiss()
-                        }
-                        .foregroundColor(CRBTheme.Colors.muted)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Success Content (extracted to help type-checker)
-
-    @ViewBuilder
-    private var successContent: some View {
-        if let wallet = generatedWallet {
-            VStack(spacing: CRBTheme.Spacing.lg) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(CRBTheme.Colors.buyGreen)
-
-                Text("Wallet Created Successfully!".localized)
-                    .font(CRBTheme.Typography.title())
-                    .foregroundColor(CRBTheme.Colors.ink)
-
-                // Warning box
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(CRBTheme.Colors.warning)
-                    Text("Write down your private key and keep it safe. If you lose it, you will lose access to your funds forever.".localized)
-                        .font(.system(size: 11))
-                        .foregroundColor(CRBTheme.Colors.warning.opacity(0.95))
-                }
-                .padding(CRBTheme.Spacing.md)
-                .background(CRBTheme.Colors.warning.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
-
-                // Address box
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("EVM Wallet Address".localized)
-                        .font(.system(size: 11))
-                        .foregroundColor(CRBTheme.Colors.muted)
-
-                    HStack {
-                        Text(wallet.address)
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(CRBTheme.Colors.ink)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer()
-                        Button {
-                            UIPasteboard.general.string = wallet.address
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .foregroundColor(CRBTheme.Colors.cyan)
-                        }
-                    }
-                    .padding(CRBTheme.Spacing.sm)
-                    .background(CRBTheme.Colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
-                }
-
-                // Private key box
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Private Key".localized)
-                        .font(.system(size: 11))
-                        .foregroundColor(CRBTheme.Colors.muted)
-
-                    HStack {
-                        Text(wallet.privateKey)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(CRBTheme.Colors.error)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer()
-                        Button {
-                            SecurePasteboard.copyWithExpiry(wallet.privateKey)
-                            withAnimation { copiedKey = true }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                copiedKey = false
-                            }
-                        } label: {
-                            Image(systemName: copiedKey ? "checkmark" : "doc.on.doc")
-                                .foregroundColor(copiedKey ? CRBTheme.Colors.success : CRBTheme.Colors.error)
-                        }
-                    }
-                    .padding(CRBTheme.Spacing.sm)
-                    .background(CRBTheme.Colors.error.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
-                            .stroke(CRBTheme.Colors.error.opacity(0.2), lineWidth: 1)
-                    )
-                }
-
-                GradientButton(title: "Done".localized, icon: "checkmark.circle.fill") {
-                    dismiss()
-                }
-                .padding(.top, CRBTheme.Spacing.md)
-            }
-            .padding(CRBTheme.Spacing.xl)
-        }
-    }
-
-    // MARK: - Form Content (extracted to help type-checker)
-
-    private var formContent: some View {
-        VStack(spacing: CRBTheme.Spacing.lg) {
-            VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
-                Text("Wallet Name".localized)
-                    .font(CRBTheme.Typography.caption())
-                    .foregroundColor(CRBTheme.Colors.muted)
-
-                TextField("e.g. My Native USDT Wallet", text: $name)
-                    .textFieldStyle(.plain)
-                    .foregroundColor(CRBTheme.Colors.ink)
-                    .padding(CRBTheme.Spacing.md)
-                    .background(CRBTheme.Colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
-            }
-
-            HStack(spacing: CRBTheme.Spacing.md) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(CRBTheme.Colors.warning)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Native USDT Signing Disabled".localized)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(CRBTheme.Colors.warning)
-
-                    Text("Production USDT transfers require an audited Solana/EVM signer or wallet provider. Link an existing USDT wallet address for receiving and P2P until native signing is added.".localized)
-                        .font(.system(size: 12))
-                        .foregroundColor(CRBTheme.Colors.muted)
-                }
-            }
-            .padding(CRBTheme.Spacing.md)
-            .background(CRBTheme.Colors.warning.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
-
-            if let error {
-                Text(error)
-                    .font(CRBTheme.Typography.caption())
-                    .foregroundColor(CRBTheme.Colors.error)
-            }
-
-            GradientButton(
-                title: "Link Existing USDT Wallet Instead".localized,
-                icon: "iphone.gen3",
-                isDisabled: true
-            ) {}
-        }
-    }
-
-    private func generateWallet() async {
-        isCreating = true
-        error = nil
-        defer { isCreating = false }
-
-        // Generate keys
-        let walletData = NativeUSDTGenerator.generate()
-
-        let newWallet = USDTWallet(
-            name: name,
-            provider: .native,
-            network: network,
-            address: walletData.address,
-            isNative: true
-        )
-
-        // Save private key in Keychain
-        do {
-            try await KeychainStore.shared.savePrivateKeyWithBiometricSetup(
-                walletData.privateKey,
-                for: newWallet.id,
-                reason: "Authenticate to protect this USDT wallet with Face ID"
-            )
-        } catch {
-            self.error = error.localizedDescription
-            return
-        }
-
-        appState.addUSDTWallet(newWallet)
-
-        generatedWallet = walletData
-    }
-}
-
-// MARK: - Native USDT SECP256k1 Mock Generator Helper
-
-struct NativeUSDTGenerator {
-    static func generate() -> (privateKey: String, address: String) {
-        var pKeyBytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, pKeyBytes.count, &pKeyBytes)
-        let privateKey = pKeyBytes.map { String(format: "%02x", $0) }.joined()
-
-        var addrBytes = [UInt8](repeating: 0, count: 20)
-        _ = SecRandomCopyBytes(kSecRandomDefault, addrBytes.count, &addrBytes)
-        let address = "0x" + addrBytes.map { String(format: "%02x", $0) }.joined()
-
-        return (privateKey, address)
     }
 }
