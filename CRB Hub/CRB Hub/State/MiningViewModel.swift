@@ -19,6 +19,7 @@ final class MiningViewModel {
     var isLoadingWorkers = false
     var workersError: String?
     var windowSecs: Int = 300
+    var workerSamplesByName: [String: [WorkerHashrateSample]] = [:]
     
     // MARK: - Health
     var poolHealth: PoolHealth?
@@ -27,6 +28,9 @@ final class MiningViewModel {
     private var refreshTask: Task<Void, Never>?
     private let liveRefreshSeconds: UInt64 = 10
     private let payoutHistoryRefreshEveryTicks = 6
+    private var previousWorkersByName: [String: PoolWorker] = [:]
+    private var lastKnownPaid: UInt64?
+    private let maxWorkerSamples = 72
     
     // MARK: - Actions
     
@@ -57,8 +61,12 @@ final class MiningViewModel {
         
         do {
             let response = try await MiningAPIClient.getWorkers(address: address)
-            workers = response.workers ?? []
+            let fetchedWorkers = response.workers ?? []
+            processWorkerNotifications(fetchedWorkers)
+            workers = fetchedWorkers
             windowSecs = response.window_secs ?? 300
+            appendWorkerSamples(fetchedWorkers)
+            previousWorkersByName = Dictionary(uniqueKeysWithValues: fetchedWorkers.map { ($0.worker, $0) })
         } catch {
             workersError = error.localizedDescription
         }
@@ -110,6 +118,7 @@ final class MiningViewModel {
 
             historyPayoutAmount = total
             historyPayoutCount = payouts.count
+            processPayoutNotification(total)
         } catch {
             historyPayoutAmount = 0
             historyPayoutCount = 0
@@ -169,6 +178,10 @@ final class MiningViewModel {
         workers.reduce(0) { $0 + $1.shares }
     }
 
+    func samples(for worker: PoolWorker) -> [WorkerHashrateSample] {
+        workerSamplesByName[worker.worker] ?? []
+    }
+
     var displayedPaid: UInt64 {
         max(myMiner?.paid ?? 0, historyPayoutAmount)
     }
@@ -183,4 +196,61 @@ final class MiningViewModel {
     var hasMiningPayoutHistory: Bool {
         historyPayoutAmount > 0 || historyPayoutCount > 0
     }
+
+    private func appendWorkerSamples(_ fetchedWorkers: [PoolWorker]) {
+        let now = Date()
+        for worker in fetchedWorkers {
+            var samples = workerSamplesByName[worker.worker] ?? []
+            samples.append(WorkerHashrateSample(timestamp: now, hashrate: worker.hashrate, shares: worker.shares, idleSeconds: worker.idle_secs))
+            if samples.count > maxWorkerSamples {
+                samples.removeFirst(samples.count - maxWorkerSamples)
+            }
+            workerSamplesByName[worker.worker] = samples
+        }
+    }
+
+    private func processWorkerNotifications(_ fetchedWorkers: [PoolWorker]) {
+        for worker in fetchedWorkers {
+            let previous = previousWorkersByName[worker.worker]
+            if worker.isIdle, previous?.isIdle != true {
+                LocalNotificationService.shared.notify(
+                    title: "Mining worker offline",
+                    body: "\(worker.worker) has not submitted shares for \(worker.idleDisplay).",
+                    key: "miner.worker.offline.\(worker.worker)",
+                    cooldown: 10 * 60
+                )
+            }
+
+            guard let previous, previous.hashrate > 0, worker.hashrate > 0 else { continue }
+            let dropRatio = worker.hashrate / previous.hashrate
+            if dropRatio <= 0.55 {
+                LocalNotificationService.shared.notify(
+                    title: "Mining hashrate dropped",
+                    body: "\(worker.worker) dropped from \(CRBUnits.formatHashrate(previous.hashrate)) to \(CRBUnits.formatHashrate(worker.hashrate)).",
+                    key: "miner.worker.hashrate.\(worker.worker)",
+                    cooldown: 10 * 60
+                )
+            }
+        }
+    }
+
+    private func processPayoutNotification(_ paid: UInt64) {
+        defer { lastKnownPaid = paid }
+        guard let lastKnownPaid, paid > lastKnownPaid else { return }
+        let delta = paid - lastKnownPaid
+        LocalNotificationService.shared.notify(
+            title: "New mining payout",
+            body: "Received \(CRBUnits.formatCRB(delta, maxFractionDigits: 8, minFractionDigits: 0)) CRB from pool payouts.",
+            key: "miner.payout",
+            cooldown: 60
+        )
+    }
+}
+
+struct WorkerHashrateSample: Identifiable, Hashable {
+    let id = UUID()
+    let timestamp: Date
+    let hashrate: Double
+    let shares: Double
+    let idleSeconds: Int
 }

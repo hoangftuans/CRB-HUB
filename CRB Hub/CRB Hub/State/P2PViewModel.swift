@@ -34,6 +34,8 @@ final class P2PViewModel {
     private let publicRefreshSeconds: UInt64 = 5
     private let privateRefreshSeconds: UInt64 = 5
     private let tradeRefreshSeconds: UInt64 = 3
+    private var knownTradeStates: [String: String] = [:]
+    private var knownChatMessageIdsByTrade: [String: Set<String>] = [:]
     
     // MARK: - Public Actions
     
@@ -123,8 +125,11 @@ final class P2PViewModel {
             async let o = P2PAPIClient.getMyOffers(token: token)
             async let t = P2PAPIClient.getMyTrades(token: token)
             
-            myOffers = try await o
-            myTrades = try await t
+            let fetchedOffers = try await o
+            let fetchedTrades = try await t
+            processTradeStateNotifications(fetchedTrades)
+            myOffers = fetchedOffers
+            myTrades = fetchedTrades
             appState?.hydrateP2PWalletBindings(offers: myOffers, trades: myTrades)
         } catch {
             // Handle auth errors
@@ -157,7 +162,9 @@ final class P2PViewModel {
         guard !isLoadingTrade else { return }
         isLoadingTrade = true
         do {
-            currentTrade = try await P2PAPIClient.getTrade(token: token, tradeId: tradeId)
+            let trade = try await P2PAPIClient.getTrade(token: token, tradeId: tradeId)
+            processTradeStateNotifications([trade])
+            currentTrade = trade
         } catch {
             // Handle error
         }
@@ -166,7 +173,9 @@ final class P2PViewModel {
     
     func loadChat(token: String, tradeId: String) async {
         do {
-            chatMessages = try await P2PAPIClient.getChat(token: token, tradeId: tradeId)
+            let messages = try await P2PAPIClient.getChat(token: token, tradeId: tradeId)
+            processChatNotifications(messages, tradeId: tradeId)
+            chatMessages = messages
         } catch {
             // Handle error
         }
@@ -252,5 +261,40 @@ final class P2PViewModel {
     
     var isTradingOpen: Bool {
         state?.tradingOpen ?? false
+    }
+
+    private func processTradeStateNotifications(_ trades: [P2PTrade]) {
+        for trade in trades {
+            guard let id = trade.ID, let state = trade.State else { continue }
+            let previous = knownTradeStates[id]
+            knownTradeStates[id] = state
+            guard let previous, previous != state else { continue }
+
+            LocalNotificationService.shared.notify(
+                title: "P2P trade updated",
+                body: "Trade \(id) changed from \(previous) to \(trade.stateLabel).",
+                key: "p2p.trade.state.\(id).\(state)",
+                cooldown: 60
+            )
+        }
+    }
+
+    private func processChatNotifications(_ messages: [P2PChatMessage], tradeId: String) {
+        let currentIds = Set(messages.map(\.id))
+        defer { knownChatMessageIdsByTrade[tradeId] = currentIds }
+
+        guard let knownIds = knownChatMessageIdsByTrade[tradeId], !knownIds.isEmpty else {
+            return
+        }
+
+        let newMessages = messages.filter { !knownIds.contains($0.id) }
+        guard let latest = newMessages.last else { return }
+        let snippet = latest.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        LocalNotificationService.shared.notify(
+            title: "New P2P chat message",
+            body: snippet?.isEmpty == false ? snippet! : "Trade \(tradeId) has a new chat message.",
+            key: "p2p.chat.\(tradeId)",
+            cooldown: 60
+        )
     }
 }

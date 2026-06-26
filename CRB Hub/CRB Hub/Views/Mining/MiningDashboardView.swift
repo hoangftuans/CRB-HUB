@@ -9,6 +9,7 @@ struct MiningDashboardView: View {
     @State private var calculatorPowerWatts = "120"
     @State private var calculatorElectricityPrice = "0.12"
     @State private var profitRefreshTask: Task<Void, Never>?
+    @State private var selectedWorker: PoolWorker?
     
     var body: some View {
         NavigationStack {
@@ -76,6 +77,9 @@ struct MiningDashboardView: View {
             }
             .navigationDestination(isPresented: $showSetup) {
                 MiningSetupView()
+            }
+            .navigationDestination(item: $selectedWorker) { worker in
+                WorkerDetailView(worker: worker, samples: viewModel.samples(for: worker))
             }
         }
     }
@@ -387,7 +391,12 @@ struct MiningDashboardView: View {
                     .padding(.vertical, CRBTheme.Spacing.md)
             } else {
                 ForEach(viewModel.workers) { worker in
-                    workerRow(worker)
+                    Button {
+                        selectedWorker = worker
+                    } label: {
+                        workerRow(worker)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -553,6 +562,191 @@ struct MiningDashboardView: View {
             }
         }
         .glassCard()
+    }
+}
+
+struct WorkerDetailView: View {
+    let worker: PoolWorker
+    let samples: [WorkerHashrateSample]
+
+    var body: some View {
+        ZStack {
+            CRBTheme.Colors.background.ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: CRBTheme.Spacing.lg) {
+                    headerCard
+                    chartCard
+                    sampleHistoryCard
+                }
+                .padding(CRBTheme.Spacing.lg)
+            }
+        }
+        .navigationTitle(worker.worker)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(worker.worker)
+                        .font(.system(size: 20, weight: .heavy, design: .monospaced))
+                        .foregroundColor(CRBTheme.Colors.ink)
+                    Text("Last share: \(worker.idleDisplay)".localized)
+                        .font(.system(size: 12))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                }
+
+                Spacer()
+
+                PillBadge(text: worker.statusLabel, color: statusColor)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: CRBTheme.Spacing.md) {
+                StatCard(icon: "speedometer", label: "Hashrate".localized, value: CRBUnits.formatHashrate(worker.hashrate), color: CRBTheme.Colors.cyan)
+                StatCard(icon: "square.stack.3d.up", label: "Shares".localized, value: String(format: "%.0f", worker.shares), color: CRBTheme.Colors.violet)
+                StatCard(icon: "clock", label: "Idle".localized, value: worker.idleDisplay, color: statusColor)
+                StatCard(icon: "waveform.path.ecg", label: "Samples".localized, value: "\(samples.count)", color: CRBTheme.Colors.info)
+            }
+        }
+        .glassCard()
+    }
+
+    private var chartCard: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            SectionHeader(title: "Hashrate History".localized, icon: "chart.xyaxis.line")
+
+            if samples.count < 2 {
+                Text("Waiting for more live samples...".localized)
+                    .font(CRBTheme.Typography.body())
+                    .foregroundColor(CRBTheme.Colors.muted)
+                    .frame(maxWidth: .infinity, minHeight: 160)
+            } else {
+                WorkerHashrateChart(samples: samples, color: statusColor)
+                    .frame(height: 180)
+
+                HStack {
+                    Text("Min \(CRBUnits.formatHashrate(minHashrate))")
+                    Spacer()
+                    Text("Avg \(CRBUnits.formatHashrate(avgHashrate))")
+                    Spacer()
+                    Text("Max \(CRBUnits.formatHashrate(maxHashrate))")
+                }
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundColor(CRBTheme.Colors.muted)
+            }
+        }
+        .glassCard()
+    }
+
+    private var sampleHistoryCard: some View {
+        VStack(alignment: .leading, spacing: CRBTheme.Spacing.md) {
+            SectionHeader(title: "Recent Samples".localized, icon: "list.bullet.rectangle")
+
+            ForEach(samples.suffix(8).reversed()) { sample in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(sample.timestamp.formatted(date: .omitted, time: .standard))
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(CRBTheme.Colors.ink)
+                        Text("\(sample.idleSeconds)s idle")
+                            .font(.system(size: 11))
+                            .foregroundColor(CRBTheme.Colors.muted)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(CRBUnits.formatHashrate(sample.hashrate))
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(CRBTheme.Colors.cyan)
+                        Text(String(format: "%.0f shares", sample.shares))
+                            .font(.system(size: 11))
+                            .foregroundColor(CRBTheme.Colors.muted)
+                    }
+                }
+                .padding(CRBTheme.Spacing.sm)
+                .background(CRBTheme.Colors.backgroundSecondary.opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+            }
+        }
+        .glassCard()
+    }
+
+    private var statusColor: Color {
+        if worker.isOnline {
+            return CRBTheme.Colors.buyGreen
+        }
+        if worker.isWarming {
+            return CRBTheme.Colors.warning
+        }
+        return CRBTheme.Colors.error
+    }
+
+    private var minHashrate: Double {
+        samples.map(\.hashrate).min() ?? worker.hashrate
+    }
+
+    private var maxHashrate: Double {
+        samples.map(\.hashrate).max() ?? worker.hashrate
+    }
+
+    private var avgHashrate: Double {
+        guard !samples.isEmpty else { return worker.hashrate }
+        return samples.reduce(0) { $0 + $1.hashrate } / Double(samples.count)
+    }
+}
+
+struct WorkerHashrateChart: View {
+    let samples: [WorkerHashrateSample]
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let values = samples.map(\.hashrate)
+            guard values.count > 1 else { return }
+
+            let minValue = values.min() ?? 0
+            let maxValue = values.max() ?? 1
+            let range = max(maxValue - minValue, 1)
+            let stepX = size.width / CGFloat(values.count - 1)
+            let topPadding: CGFloat = 12
+            let bottomPadding: CGFloat = 18
+            let chartHeight = max(size.height - topPadding - bottomPadding, 1)
+
+            var gridPath = Path()
+            for index in 0...3 {
+                let y = topPadding + (chartHeight * CGFloat(index) / 3)
+                gridPath.move(to: CGPoint(x: 0, y: y))
+                gridPath.addLine(to: CGPoint(x: size.width, y: y))
+            }
+            context.stroke(gridPath, with: .color(CRBTheme.Colors.cardBorder.opacity(0.55)), lineWidth: 1)
+
+            var linePath = Path()
+            for (index, value) in values.enumerated() {
+                let x = CGFloat(index) * stepX
+                let normalized = (value - minValue) / range
+                let y = topPadding + chartHeight - (chartHeight * CGFloat(normalized))
+                let point = CGPoint(x: x, y: y)
+                if index == 0 {
+                    linePath.move(to: point)
+                } else {
+                    linePath.addLine(to: point)
+                }
+            }
+
+            context.stroke(linePath, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+
+            if let last = values.last {
+                let normalized = (last - minValue) / range
+                let point = CGPoint(x: size.width, y: topPadding + chartHeight - (chartHeight * CGFloat(normalized)))
+                context.fill(Path(ellipseIn: CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)), with: .color(color))
+            }
+        }
+        .padding(.vertical, CRBTheme.Spacing.sm)
+        .background(CRBTheme.Colors.backgroundSecondary.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.md))
     }
 }
 

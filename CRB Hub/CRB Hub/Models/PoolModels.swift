@@ -36,7 +36,7 @@ struct WorkersResponse: Codable {
 }
 
 /// Individual worker stats
-struct PoolWorker: Codable, Identifiable {
+struct PoolWorker: Codable, Identifiable, Hashable {
     var id: String { worker }
     
     let worker: String

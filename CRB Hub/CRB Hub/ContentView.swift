@@ -34,6 +34,17 @@ struct ContentView: View {
         .keyboardDismissSupport()
         .animation(.easeInOut(duration: 0.3), value: appState.hasCompletedOnboarding)
         .animation(.easeInOut(duration: 0.2), value: appState.isAppLocked)
+        .task {
+            if appState.hasCompletedOnboarding {
+                await LocalNotificationService.shared.requestAuthorizationIfNeeded()
+            }
+        }
+        .onChange(of: appState.hasCompletedOnboarding) { _, completed in
+            guard completed else { return }
+            Task {
+                await LocalNotificationService.shared.requestAuthorizationIfNeeded()
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
