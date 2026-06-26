@@ -10,6 +10,8 @@ final class MiningViewModel {
     var myMiner: PoolMiner?
     var historyPayoutAmount: UInt64 = 0
     var historyPayoutCount = 0
+    var dailyPayoutAmount: UInt64 = 0
+    var dailyPayoutCount = 0
     var historyPayoutError: String?
     var isLoadingStats = false
     var statsError: String?
@@ -105,6 +107,11 @@ final class MiningViewModel {
             }
 
             let payouts = transactions.filter { $0.isMiningPayout(for: address, poolAddress: poolAddress) }
+            let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60).timeIntervalSince1970
+            let dailyPayouts = payouts.filter { transaction in
+                guard let time = transaction.time else { return false }
+                return TimeInterval(time) >= oneDayAgo
+            }
 
             var total: UInt64 = 0
             for payout in payouts {
@@ -116,12 +123,26 @@ final class MiningViewModel {
                 total = result.partialValue
             }
 
+            var dailyTotal: UInt64 = 0
+            for payout in dailyPayouts {
+                let result = dailyTotal.addingReportingOverflow(payout.amount)
+                if result.overflow {
+                    dailyTotal = UInt64.max
+                    break
+                }
+                dailyTotal = result.partialValue
+            }
+
             historyPayoutAmount = total
             historyPayoutCount = payouts.count
+            dailyPayoutAmount = dailyTotal
+            dailyPayoutCount = dailyPayouts.count
             processPayoutNotification(total)
         } catch {
             historyPayoutAmount = 0
             historyPayoutCount = 0
+            dailyPayoutAmount = 0
+            dailyPayoutCount = 0
             historyPayoutError = error.localizedDescription
         }
     }

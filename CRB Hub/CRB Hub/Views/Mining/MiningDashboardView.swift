@@ -105,6 +105,15 @@ struct MiningDashboardView: View {
         profitRefreshTask?.cancel()
         profitRefreshTask = nil
     }
+
+    private func dailyPayoutSubtitle(fiatValue: String?) -> String {
+        let count = viewModel.dailyPayoutCount
+        let countText = count == 1 ? "1 payout" : "\(count) payouts"
+        if let fiatValue {
+            return "\(fiatValue) • \(countText)"
+        }
+        return countText
+    }
     
     // MARK: - My Miner
     
@@ -121,6 +130,7 @@ struct MiningDashboardView: View {
                 let owed = miner?.owed ?? 0
                 let paid = viewModel.displayedPaid
                 let earned = viewModel.displayedEarned
+                let dailyPaid = viewModel.dailyPayoutAmount
                 let shares = miner?.shares ?? 0
                 let hashrate = miner?.hashrate ?? viewModel.totalHashrate
 
@@ -156,6 +166,9 @@ struct MiningDashboardView: View {
                 let earnedFiat = CurrencyManager.convertCRBToFiat(baseUnits: earned, priceUSDT: price, rates: rates, targetCurrency: currency).map {
                     "≈ " + CurrencyManager.formatFiat($0, currencyCode: currency)
                 }
+                let dailyPaidFiat = CurrencyManager.convertCRBToFiat(baseUnits: dailyPaid, priceUSDT: price, rates: rates, targetCurrency: currency).map {
+                    "≈ " + CurrencyManager.formatFiat($0, currencyCode: currency)
+                }
                 
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
@@ -163,6 +176,7 @@ struct MiningDashboardView: View {
                 ], spacing: CRBTheme.Spacing.md) {
                     StatCard(icon: "banknote", label: "Owed".localized, value: CRBUnits.formatCRBCompact(owed), color: CRBTheme.Colors.warning, subtitle: owedFiat)
                     StatCard(icon: "checkmark.circle", label: "Paid".localized, value: CRBUnits.formatCRBCompact(paid), color: CRBTheme.Colors.buyGreen, subtitle: paidFiat)
+                    StatCard(icon: "calendar.badge.clock", label: "Daily Payout".localized, value: CRBUnits.formatCRBCompact(dailyPaid), color: CRBTheme.Colors.success, subtitle: dailyPayoutSubtitle(fiatValue: dailyPaidFiat))
                     StatCard(icon: "chart.line.uptrend.xyaxis", label: "Earned".localized, value: CRBUnits.formatCRBCompact(earned), color: CRBTheme.Colors.cyan, subtitle: earnedFiat)
                     StatCard(icon: "square.stack.3d.up", label: "Shares".localized, value: String(format: "%.0f", shares), color: CRBTheme.Colors.violet)
                 }
