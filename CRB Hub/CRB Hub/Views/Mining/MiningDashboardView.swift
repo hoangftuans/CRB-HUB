@@ -8,6 +8,7 @@ struct MiningDashboardView: View {
     @State private var calculatorUnit: MiningHashrateUnit = .mega
     @State private var calculatorPowerWatts = "120"
     @State private var calculatorElectricityPrice = "0.12"
+    @State private var profitRefreshTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -55,9 +56,11 @@ struct MiningDashboardView: View {
                     viewModel.startAutoRefresh(address: addr)
                 }
                 await refreshProfitInputs()
+                startProfitAutoRefresh()
             }
             .onDisappear {
                 viewModel.stopAutoRefresh()
+                stopProfitAutoRefresh()
             }
             .onChange(of: appState.selectedWallet?.id) { _, _ in
                 if let addr = appState.selectedWallet?.address {
@@ -81,6 +84,22 @@ struct MiningDashboardView: View {
         await appState.refreshChainStatus()
         await appState.refreshP2PStats()
         await appState.refreshFiatRates()
+    }
+
+    private func startProfitAutoRefresh() {
+        stopProfitAutoRefresh()
+        profitRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { return }
+                await refreshProfitInputs()
+            }
+        }
+    }
+
+    private func stopProfitAutoRefresh() {
+        profitRefreshTask?.cancel()
+        profitRefreshTask = nil
     }
     
     // MARK: - My Miner
@@ -358,6 +377,8 @@ struct MiningDashboardView: View {
                     }
                 }
             }
+
+            workerSummaryStrip
             
             if viewModel.workers.isEmpty && !viewModel.isLoadingWorkers {
                 Text("No workers found in the last 5 minutes".localized)
@@ -372,39 +393,101 @@ struct MiningDashboardView: View {
         }
         .glassCard()
     }
+
+    private var workerSummaryStrip: some View {
+        HStack(spacing: CRBTheme.Spacing.sm) {
+            workerMetric("Total Hashrate".localized, CRBUnits.formatHashrate(viewModel.totalHashrate), icon: "speedometer")
+            workerMetric("Shares".localized, String(format: "%.0f", viewModel.totalShares), icon: "square.stack.3d.up")
+            workerMetric("Window".localized, "\(viewModel.windowSecs / 60)m", icon: "clock.arrow.circlepath")
+        }
+    }
+
+    private func workerMetric(_ title: String, _ value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundColor(CRBTheme.Colors.muted)
+
+            Text(value)
+                .font(.system(size: 12, weight: .heavy, design: .monospaced))
+                .foregroundColor(CRBTheme.Colors.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(CRBTheme.Spacing.sm)
+        .background(CRBTheme.Colors.backgroundSecondary.opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+    }
     
     private func workerRow(_ worker: PoolWorker) -> some View {
-        HStack(spacing: CRBTheme.Spacing.md) {
-            // Status indicator
-            Circle()
-                .fill(worker.isIdle ? CRBTheme.Colors.error : CRBTheme.Colors.buyGreen)
-                .frame(width: 8, height: 8)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(worker.worker)
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundColor(CRBTheme.Colors.ink)
-                
-                Text(worker.statusLabel)
-                    .font(.system(size: 11))
-                    .foregroundColor(worker.isIdle ? CRBTheme.Colors.error : CRBTheme.Colors.muted)
+        let statusColor = workerStatusColor(worker)
+
+        return VStack(alignment: .leading, spacing: CRBTheme.Spacing.sm) {
+            HStack(spacing: CRBTheme.Spacing.sm) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 9, height: 9)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(worker.worker)
+                        .font(.system(size: 14, weight: .heavy, design: .monospaced))
+                        .foregroundColor(CRBTheme.Colors.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text("Last share: \(worker.idleDisplay)".localized)
+                        .font(.system(size: 11))
+                        .foregroundColor(CRBTheme.Colors.muted)
+                }
+
+                Spacer()
+
+                PillBadge(text: worker.statusLabel, color: statusColor)
             }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(CRBUnits.formatHashrate(worker.hashrate))
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundColor(CRBTheme.Colors.ink)
-                
-                Text(String(format: "%@ shares".localized, String(format: "%.0f", worker.shares)))
-                    .font(.system(size: 11))
-                    .foregroundColor(CRBTheme.Colors.muted)
+
+            HStack(spacing: CRBTheme.Spacing.sm) {
+                workerRowMetric("Hashrate".localized, CRBUnits.formatHashrate(worker.hashrate), color: CRBTheme.Colors.cyan)
+                workerRowMetric("Shares".localized, String(format: "%.0f", worker.shares), color: CRBTheme.Colors.violet)
+                workerRowMetric("Idle".localized, worker.idleDisplay, color: statusColor)
             }
         }
         .padding(CRBTheme.Spacing.md)
-        .background(worker.isIdle ? CRBTheme.Colors.error.opacity(0.05) : Color.clear)
+        .background(statusColor.opacity(worker.isOnline ? 0.055 : 0.075))
         .clipShape(RoundedRectangle(cornerRadius: CRBTheme.Radius.sm))
+        .overlay(
+            RoundedRectangle(cornerRadius: CRBTheme.Radius.sm)
+                .stroke(statusColor.opacity(0.16), lineWidth: 1)
+        )
+    }
+
+    private func workerRowMetric(_ title: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(CRBTheme.Colors.muted)
+            Text(value)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func workerStatusColor(_ worker: PoolWorker) -> Color {
+        if worker.isOnline {
+            return CRBTheme.Colors.buyGreen
+        }
+        if worker.isWarming {
+            return CRBTheme.Colors.warning
+        }
+        return CRBTheme.Colors.error
     }
     
     // MARK: - Pool Stats

@@ -142,6 +142,7 @@ final class AppState {
             saveDefaultP2PUSDTWallets()
         }
     }
+    private var isRefreshingUSDTBalances = false
 
     init() {
         loadState()
@@ -467,6 +468,10 @@ final class AppState {
     }
 
     func refreshUSDTBalances() async {
+        guard !isRefreshingUSDTBalances else { return }
+        isRefreshingUSDTBalances = true
+        defer { isRefreshingUSDTBalances = false }
+
         for index in 0..<linkedUSDTWallets.count {
             let wallet = linkedUSDTWallets[index]
             do {

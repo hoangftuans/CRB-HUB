@@ -47,6 +47,14 @@ struct PoolWorker: Codable, Identifiable {
     var isIdle: Bool {
         idle_secs > 300
     }
+
+    var isOnline: Bool {
+        idle_secs <= 60
+    }
+
+    var isWarming: Bool {
+        idle_secs > 60 && idle_secs <= 300
+    }
     
     var statusLabel: String {
         if idle_secs <= 60 {
@@ -56,6 +64,20 @@ struct PoolWorker: Codable, Identifiable {
         } else {
             return "Offline".localized + " \(idle_secs / 60)m"
         }
+    }
+
+    var idleDisplay: String {
+        if idle_secs <= 0 {
+            return "now"
+        }
+        if idle_secs < 60 {
+            return "\(idle_secs)s ago"
+        }
+        let minutes = idle_secs / 60
+        if minutes < 60 {
+            return "\(minutes)m ago"
+        }
+        return "\(minutes / 60)h \(minutes % 60)m ago"
     }
 }
 

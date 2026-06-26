@@ -29,6 +29,8 @@ final class WalletViewModel {
     
     // MARK: - Auto Refresh
     private var refreshTask: Task<Void, Never>?
+    private let liveRefreshSeconds: UInt64 = 10
+    private let historyRefreshEveryTicks = 3
     
     // MARK: - Actions
     
@@ -59,7 +61,6 @@ final class WalletViewModel {
         if refresh {
             historyOffset = 0
             hasMoreHistory = true
-            transactions = []
         }
         
         guard hasMoreHistory else { return }
@@ -191,11 +192,19 @@ final class WalletViewModel {
     func startAutoRefresh(address: String) {
         stopAutoRefresh()
         refreshTask = Task {
+            var tick = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(liveRefreshSeconds))
                 guard !Task.isCancelled else { return }
-                await loadBalance(address: address)
-                await loadChainStatus()
+                tick += 1
+
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask { await self.loadBalance(address: address) }
+                    group.addTask { await self.loadChainStatus() }
+                    if tick % self.historyRefreshEveryTicks == 0 {
+                        group.addTask { await self.loadHistory(address: address, refresh: true) }
+                    }
+                }
             }
         }
     }

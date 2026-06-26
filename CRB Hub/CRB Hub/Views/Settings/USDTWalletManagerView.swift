@@ -7,6 +7,7 @@ struct USDTWalletManagerView: View {
     @State private var isRefreshing = false
     @State private var isSyncingSafeTrade = false
     @State private var safeTradeSyncMessage: String?
+    @State private var balanceRefreshTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -105,6 +106,10 @@ struct USDTWalletManagerView: View {
         .task {
             // Load balances on load
             await appState.refreshUSDTBalances()
+            startBalanceAutoRefresh()
+        }
+        .onDisappear {
+            stopBalanceAutoRefresh()
         }
     }
 
@@ -390,6 +395,22 @@ struct USDTWalletManagerView: View {
             }
             isSyncingSafeTrade = false
         }
+    }
+
+    private func startBalanceAutoRefresh() {
+        stopBalanceAutoRefresh()
+        balanceRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { return }
+                await appState.refreshUSDTBalances()
+            }
+        }
+    }
+
+    private func stopBalanceAutoRefresh() {
+        balanceRefreshTask?.cancel()
+        balanceRefreshTask = nil
     }
 }
 

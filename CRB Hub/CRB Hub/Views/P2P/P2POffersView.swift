@@ -41,13 +41,17 @@ struct P2POffersView: View {
         .task {
             if let token = appState.p2pToken {
                 await viewModel.loadMyData(token: token, appState: appState)
+                viewModel.startAuthenticatedRefresh(token: token, appState: appState)
             }
             await refreshLiveRates(includeFiat: true)
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { return }
                 await refreshLiveRates(includeFiat: false)
             }
+        }
+        .onDisappear {
+            viewModel.stopAutoRefresh()
         }
         .sheet(isPresented: $showCreateOffer) {
             createOfferSheet

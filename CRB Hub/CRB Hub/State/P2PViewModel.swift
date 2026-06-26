@@ -31,10 +31,14 @@ final class P2PViewModel {
     // MARK: - Auto Refresh
     private var refreshTask: Task<Void, Never>?
     private var chatRefreshTask: Task<Void, Never>?
+    private let publicRefreshSeconds: UInt64 = 5
+    private let privateRefreshSeconds: UInt64 = 5
+    private let tradeRefreshSeconds: UInt64 = 3
     
     // MARK: - Public Actions
     
     func loadPublicData() async {
+        guard !isLoadingPublic else { return }
         isLoadingPublic = true
         publicError = nil
         
@@ -112,6 +116,7 @@ final class P2PViewModel {
     // MARK: - Trading Actions
     
     func loadMyData(token: String, appState: AppState? = nil) async {
+        guard !isLoadingMyData else { return }
         isLoadingMyData = true
         
         do {
@@ -149,6 +154,7 @@ final class P2PViewModel {
     }
     
     func loadTrade(token: String, tradeId: String) async {
+        guard !isLoadingTrade else { return }
         isLoadingTrade = true
         do {
             currentTrade = try await P2PAPIClient.getTrade(token: token, tradeId: tradeId)
@@ -195,9 +201,20 @@ final class P2PViewModel {
         stopAutoRefresh()
         refreshTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(publicRefreshSeconds))
                 guard !Task.isCancelled else { return }
                 await loadPublicData()
+            }
+        }
+    }
+
+    func startAuthenticatedRefresh(token: String, appState: AppState? = nil) {
+        stopAutoRefresh()
+        refreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(privateRefreshSeconds))
+                guard !Task.isCancelled else { return }
+                await loadMyData(token: token, appState: appState)
             }
         }
     }
@@ -206,10 +223,12 @@ final class P2PViewModel {
         chatRefreshTask?.cancel()
         chatRefreshTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(tradeRefreshSeconds))
                 guard !Task.isCancelled else { return }
-                await loadChat(token: token, tradeId: tradeId)
-                await loadTrade(token: token, tradeId: tradeId)
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask { await self.loadChat(token: token, tradeId: tradeId) }
+                    group.addTask { await self.loadTrade(token: token, tradeId: tradeId) }
+                }
             }
         }
     }

@@ -79,6 +79,11 @@ struct P2PMarketView: View {
                 await viewModel.loadPublicData()
                 await refreshLiveRates(includeFiat: true)
                 viewModel.startPublicRefresh()
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(5))
+                    guard !Task.isCancelled else { return }
+                    await refreshLiveRates(includeFiat: false)
+                }
             }
             .onDisappear {
                 viewModel.stopAutoRefresh()

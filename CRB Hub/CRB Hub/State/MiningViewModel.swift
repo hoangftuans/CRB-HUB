@@ -25,10 +25,13 @@ final class MiningViewModel {
     
     // MARK: - Auto Refresh
     private var refreshTask: Task<Void, Never>?
+    private let liveRefreshSeconds: UInt64 = 10
+    private let payoutHistoryRefreshEveryTicks = 6
     
     // MARK: - Actions
     
     func loadPoolStats(minerAddress: String) async {
+        guard !isLoadingStats else { return }
         isLoadingStats = true
         statsError = nil
         
@@ -48,6 +51,7 @@ final class MiningViewModel {
     }
     
     func loadWorkers(address: String) async {
+        guard !isLoadingWorkers else { return }
         isLoadingWorkers = true
         workersError = nil
         
@@ -114,22 +118,30 @@ final class MiningViewModel {
     }
     
     func loadAll(address: String) async {
+        await loadLive(address: address)
+        await loadPayoutHistory(address: address)
+    }
+
+    func loadLive(address: String) async {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadPoolStats(minerAddress: address) }
             group.addTask { await self.loadWorkers(address: address) }
             group.addTask { await self.loadHealth() }
         }
-
-        await loadPayoutHistory(address: address)
     }
     
     func startAutoRefresh(address: String) {
         stopAutoRefresh()
         refreshTask = Task {
+            var tick = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
+                try? await Task.sleep(for: .seconds(liveRefreshSeconds))
                 guard !Task.isCancelled else { return }
-                await loadAll(address: address)
+                tick += 1
+                await loadLive(address: address)
+                if tick % payoutHistoryRefreshEveryTicks == 0 {
+                    await loadPayoutHistory(address: address)
+                }
             }
         }
     }
@@ -151,6 +163,10 @@ final class MiningViewModel {
     
     var totalHashrate: Double {
         workers.reduce(0) { $0 + $1.hashrate }
+    }
+
+    var totalShares: Double {
+        workers.reduce(0) { $0 + $1.shares }
     }
 
     var displayedPaid: UInt64 {

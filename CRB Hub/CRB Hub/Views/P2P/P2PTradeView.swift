@@ -59,7 +59,7 @@ struct P2PTradeView: View {
                 await refreshLiveRates(includeFiat: true)
                 viewModel.startChatRefresh(token: token, tradeId: tradeId)
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(10))
+                    try? await Task.sleep(for: .seconds(5))
                     guard !Task.isCancelled else { return }
                     await refreshLiveRates(includeFiat: false)
                 }
